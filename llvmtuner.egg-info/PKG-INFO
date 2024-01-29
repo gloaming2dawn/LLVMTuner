@@ -1,0 +1,5 @@
+Metadata-Version: 2.1
+Name: llvmtuner
+Version: 0.0.3
+Author: Jiayu Zhao
+Requires-Python: >=3.7

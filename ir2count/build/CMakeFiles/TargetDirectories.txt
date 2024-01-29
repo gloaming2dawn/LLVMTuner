@@ -1,0 +1,6 @@
+/home/jiayu/LLVMTuner_v3/ir2count/build/CMakeFiles/intrinsics_gen.dir
+/home/jiayu/LLVMTuner_v3/ir2count/build/CMakeFiles/edit_cache.dir
+/home/jiayu/LLVMTuner_v3/ir2count/build/CMakeFiles/rebuild_cache.dir
+/home/jiayu/LLVMTuner_v3/ir2count/build/lib/CMakeFiles/ir2count.dir
+/home/jiayu/LLVMTuner_v3/ir2count/build/lib/CMakeFiles/edit_cache.dir
+/home/jiayu/LLVMTuner_v3/ir2count/build/lib/CMakeFiles/rebuild_cache.dir

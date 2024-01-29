@@ -1,0 +1,2 @@
+[console_scripts]
+clangopt = llvmtuner.clangopt:main

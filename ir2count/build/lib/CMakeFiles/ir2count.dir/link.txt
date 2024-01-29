@@ -1,0 +1,1 @@
+/usr/bin/c++ -fPIC  -O2 -Wall    -fdiagnostics-color=always -fno-rtti -fvisibility-inlines-hidden -g -shared -Wl,-soname,libir2count.so -o libir2count.so CMakeFiles/ir2count.dir/ir2count.cpp.o   -L/home/jiayu/llvm10.0.0/lib 
