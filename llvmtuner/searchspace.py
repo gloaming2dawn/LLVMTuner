@@ -12,25 +12,27 @@ from llvmtuner import globalvar
 analysis_passes=['-callgraph','-lcg','-module-summary','-no-op-module','-profile-summary','-stack-safety','-verify','-pass-instrumentation','-asan-globals-md','-inline-advisor','-ir-similarity','-no-op-cgscc','-fam-proxy', '-pass-instrumentation','-aa','-assumptions','-block-freq','-branch-prob','-domtree','-postdomtree','-demanded-bits','-domfrontier','-func-properties','-loops','-lazy-value-info','-da','-inliner-size-estimator','-memdep','-memoryssa','-phi-values','-regions','-no-op-function','-opt-remark-emit','-scalar-evolution','-stack-safety-local','-targetlibinfo','-basicaa','-targetir','-pass-instrumentation','-basic-aa','-cfl-anders-aa','-cfl-steens-aa','-objc-arc-aa','-scev-aa','-scoped-noalias-aa','-tbaa','-no-op-loop','-access-info','-ddg','-iv-users','-pass-instrumentation','-transform-warning','-domtree','-profile-summary-info','-scalar-evolution','-lcssa-verification','-lazy-block-freq','-demanded-bits','-basiccg', '-loop-accesses','-globals-aa','-lazy-branch-prob','-opt-remark-emitter','-tti','-tbaa','-scoped-noalias', '-scoped-noalias-aa','-assumption-cache-tracker','-targetlibinfo','-verify','-lazy-block-freq']
 
 def default_space():
-    # cmd='llvm-as < /dev/null | opt -enable-new-pm=0 -O3 -disable-output -debug-pass=Arguments 2> O3_debug_passes.txt'
+    cmd='llvm-as < /dev/null | opt -enable-new-pm=0 -O3 -disable-output -debug-pass=Arguments 2> O3_debug_passes.txt'
     # cmd='llvm-as < /dev/null | opt -O3 -disable-output -debug-pass=Arguments 2> O3_debug_passes.txt'
-    # subprocess.run(cmd, shell=True)
-    # with open('O3_debug_passes.txt', 'r') as f:
-    #     string=f.read()
-    # O3_seq=string.split()
-    # O3_seq=[x for x in O3_seq if x != 'Pass' and x != 'Arguments:']    
-    # O3_trans_seq=[x for x in O3_seq if x not in analysis_passes]
-    # other_passes='-attributor -break-crit-edges -loop-data-prefetch -loop-fusion -loop-reduce -loop-predication -loop-interchange -loop-simplifycfg -loop-unroll-and-jam -lowerinvoke -mergefunc -partial-inliner -sink -slsr -always-inline'.split()
-    # passes=list(set(O3_trans_seq + other_passes))
+    subprocess.run(cmd, shell=True)
+    with open('O3_debug_passes.txt', 'r') as f:
+        string=f.read()
+    O3_seq=string.split()
+    O3_seq=[x for x in O3_seq if x != 'Pass' and x != 'Arguments:']    
+    O3_trans_seq=[x for x in O3_seq if x not in analysis_passes]
+    other_passes='-attributor -break-crit-edges -loop-data-prefetch -loop-fusion -loop-reduce -loop-predication -loop-interchange -loop-simplifycfg -loop-unroll-and-jam -lowerinvoke -mergefunc -partial-inliner -sink -slsr -always-inline'.split()
+    passes=list(set(O3_trans_seq + other_passes))
     # # print('O3 seq length:',len(O3_trans_seq), 'O3 transform pass number:',len(O3_trans_passes))
     # os.remove('O3_debug_passes.txt')
     # passes = sorted(passes)
     
-    passes=['-adce', '-aggressive-instcombine', '-alignment-from-assumptions', '-always-inline', '-argpromotion', '-attributor', '-barrier', '-bdce', '-break-crit-edges', '-called-value-propagation', '-callsite-splitting', '-constmerge', '-correlated-propagation', '-deadargelim', '-div-rem-pairs', '-dse', '-early-cse', '-early-cse-memssa', '-ee-instrument', '-elim-avail-extern', '-float2int', '-forceattrs', '-functionattrs', '-globaldce', '-globalopt', '-gvn', '-indvars', '-inferattrs', '-inline', '-instcombine', '-instsimplify', '-ipsccp', '-jump-threading', '-lcssa', '-libcalls-shrinkwrap', '-licm', '-loop-data-prefetch', '-loop-deletion', '-loop-distribute', '-loop-fusion', '-loop-idiom', '-loop-interchange', '-loop-load-elim', '-loop-predication', '-loop-reduce', '-loop-rotate', '-loop-simplify', '-loop-simplifycfg', '-loop-sink', '-loop-unroll', '-loop-unroll-and-jam', '-loop-unswitch', '-loop-vectorize', '-lower-constant-intrinsics', '-lower-expect', '-lowerinvoke', '-mem2reg', '-memcpyopt', '-mergefunc', '-mldst-motion', '-partial-inliner', '-pgo-memop-opt', '-prune-eh', '-reassociate', '-rpo-functionattrs', '-sccp', '-simplifycfg', '-sink', '-slp-vectorizer', '-speculative-execution', '-sroa', '-strip-dead-prototypes', '-tailcallelim']
+    # passes=['-adce', '-aggressive-instcombine', '-alignment-from-assumptions', '-always-inline', '-argpromotion', '-attributor', '-barrier', '-bdce', '-break-crit-edges', '-called-value-propagation', '-callsite-splitting', '-constmerge', '-correlated-propagation', '-deadargelim', '-div-rem-pairs', '-dse', '-early-cse', '-early-cse-memssa', '-ee-instrument', '-elim-avail-extern', '-float2int', '-forceattrs', '-functionattrs', '-globaldce', '-globalopt', '-gvn', '-indvars', '-inferattrs', '-inline', '-instcombine', '-instsimplify', '-ipsccp', '-jump-threading', '-lcssa', '-libcalls-shrinkwrap', '-licm', '-loop-data-prefetch', '-loop-deletion', '-loop-distribute', '-loop-fusion', '-loop-idiom', '-loop-interchange', '-loop-load-elim', '-loop-predication', '-loop-reduce', '-loop-rotate', '-loop-simplify', '-loop-simplifycfg', '-loop-sink', '-loop-unroll', '-loop-unroll-and-jam', '-loop-unswitch', '-loop-vectorize', '-lower-constant-intrinsics', '-lower-expect', '-lowerinvoke', '-mem2reg', '-memcpyopt', '-mergefunc', '-mldst-motion', '-partial-inliner', '-pgo-memop-opt', '-prune-eh', '-reassociate', '-rpo-functionattrs', '-sccp', '-simplifycfg', '-sink', '-slp-vectorizer', '-speculative-execution', '-sroa', '-strip-dead-prototypes', '-tailcallelim']
     
-    passes_Cbench=['-adce', '-argpromotion', '-barrier', '-bdce', '-break-crit-edges', '-called-value-propagation', '-constmerge', '-dse', '-early-cse', '-early-cse-memssa', '-ee-instrument', '-elim-avail-extern', '-functionattrs', '-globalopt', '-gvn', '-indvars', '-inferattrs', '-inline', '-instcombine', '-ipsccp', '-jump-threading', '-licm', '-loop-fusion', '-loop-idiom', '-loop-reduce', '-loop-rotate', '-loop-simplifycfg', '-loop-unroll', '-loop-unswitch', '-loop-vectorize', '-mem2reg', '-reassociate', '-separate-const-offset-from-gep', '-simplifycfg', '-sink', '-slp-vectorizer', '-slsr', '-sroa', '-strip-dead-prototypes', '-tailcallelim']#'-separate-const-offset-from-gep', '-slsr', 
-    
-    passes = passes + passes_Cbench
+    # passes_Cbench=['-adce', '-argpromotion', '-barrier', '-bdce', '-break-crit-edges', '-called-value-propagation', '-constmerge', '-dse', '-early-cse', '-early-cse-memssa', '-ee-instrument', '-elim-avail-extern', '-functionattrs', '-globalopt', '-gvn', '-indvars', '-inferattrs', '-inline', '-instcombine', '-ipsccp', '-jump-threading', '-licm', '-loop-fusion', '-loop-idiom', '-loop-reduce', '-loop-rotate', '-loop-simplifycfg', '-loop-unroll', '-loop-unswitch', '-loop-vectorize', '-mem2reg', '-reassociate', '-separate-const-offset-from-gep', '-simplifycfg', '-sink', '-slp-vectorizer', '-slsr', '-sroa', '-strip-dead-prototypes', '-tailcallelim']#'-separate-const-offset-from-gep', '-slsr', 
+    # for x in passes_Cbench:
+    #     if x not in passes:
+    #         print(x)
+    # passes = passes + passes_Cbench
     passes = sorted(set(passes))
     return passes
 
@@ -38,7 +40,11 @@ def default_space():
 def compilergym_space():  
     passes=['-add-discriminators', '-adce', '-aggressive-instcombine', '-alignment-from-assumptions', '-always-inline', '-argpromotion', '-attributor', '-barrier', '-bdce', '-break-crit-edges', '-simplifycfg', '-callsite-splitting', '-called-value-propagation', '-canonicalize-aliases', '-consthoist', '-constmerge', '-constprop', '-coro-cleanup', '-coro-early', '-coro-elide', '-coro-split', '-correlated-propagation', '-cross-dso-cfi', '-deadargelim', '-dce', '-die', '-dse', '-reg2mem', '-div-rem-pairs', '-early-cse-memssa', '-elim-avail-extern', '-ee-instrument', '-flattencfg', '-float2int', '-forceattrs', '-inline', '-insert-gcov-profiling', '-gvn-hoist', '-gvn', '-globaldce', '-globalopt', '-globalsplit', '-guard-widening', '-hotcoldsplit', '-ipconstprop', '-ipsccp', '-indvars', '-irce', '-infer-address-spaces', '-inferattrs', '-inject-tli-mappings', '-instsimplify', '-instcombine', '-instnamer', '-jump-threading', '-lcssa', '-licm', '-libcalls-shrinkwrap', '-load-store-vectorizer', '-loop-data-prefetch', '-loop-deletion', '-loop-distribute', '-loop-fusion', '-loop-guard-widening', '-loop-idiom', '-loop-instsimplify', '-loop-interchange', '-loop-load-elim', '-loop-predication', '-loop-reroll', '-loop-rotate', '-loop-simplifycfg', '-loop-simplify', '-loop-sink', '-loop-reduce', '-loop-unroll-and-jam', '-loop-unroll', '-loop-unswitch', '-loop-vectorize', '-loop-versioning-licm', '-loop-versioning', '-loweratomic', '-lower-constant-intrinsics', '-lower-expect', '-lower-guard-intrinsic', '-lowerinvoke', '-lower-matrix-intrinsics', '-lowerswitch', '-lower-widenable-condition', '-memcpyopt', '-mergefunc', '-mergeicmps', '-mldst-motion', '-sancov', '-name-anon-globals', '-nary-reassociate', '-newgvn', '-pgo-memop-opt', '-partial-inliner', '-partially-inline-libcalls', '-post-inline-ee-instrument', '-functionattrs', '-mem2reg', '-prune-eh', '-reassociate', '-redundant-dbg-inst-elim', '-rpo-functionattrs', '-rewrite-statepoints-for-gc', '-sccp', '-slp-vectorizer', '-sroa', '-scalarizer', '-separate-const-offset-from-gep', '-simple-loop-unswitch', '-sink', '-speculative-execution', '-slsr', '-strip-dead-prototypes', '-strip-debug-declare', '-strip-nondebug', '-strip', '-tailcallelim', '-mergereturn']
     return passes
-    
+
+if __name__ == "__main__":
+    print(default_space())
+    print(len(default_space()))
+    # print(globalvar.get_value('compilergym_pass
     
 # compilergym_unuseful_passes = '-add-discriminators'
 # compilergym_passes = '-add-discriminators'

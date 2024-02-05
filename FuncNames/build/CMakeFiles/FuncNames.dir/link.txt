@@ -1,0 +1,1 @@
+/usr/bin/c++ -fPIC  -fno-rtti -shared -Wl,-soname,libFuncNames.so -o libFuncNames.so CMakeFiles/FuncNames.dir/FuncNames.cpp.o 

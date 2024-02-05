@@ -35,6 +35,11 @@ cmake -DLT_LLVM_INSTALL_DIR=$LLVM_DIR ..
 make
 ```
 
+### 3. 下载FlameGraph
+```
+git clone https://github.com/brendangregg/FlameGraph.git
+```
+
 ## 快速测试
 ### 1. 本机在CBench上测试
 解压并进入cBench_V1.1目录，执行以下命令为所有benchmarks创建工作目录
@@ -159,5 +164,5 @@ python run_spec_ssh.py --method=BO --budget=100 --benchmark=538.imagick_r --devi
 ![spec](./examples/spec.pdf "Magic Gardens")
 
 ## To do
-在调优框架部位，后续我们还将提供更进一步的BO方法介绍和更多ablation实验细节。
+在调优框架部分，后续我们还将提供更进一步的BO方法介绍和更多ablation实验细节。
 

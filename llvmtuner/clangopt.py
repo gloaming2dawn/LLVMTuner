@@ -187,6 +187,7 @@ class Clangopt:
             if self.hotfiles: 
                 for x in self.cdb:
                     reldir,filename = os.path.split(x['file'])
+                    # fileroot,fileext=os.path.splitext(filename)
                     if filename in self.hotfiles:
                         flag = self._single_compile(x)
                         # 改变源文件时间戳保证下次仍然会重新编译
@@ -254,7 +255,7 @@ class Clangopt:
     
     
     @classmethod
-    def opt(cls, llvm_dir, opt_params,  IR, IR_pgouse, IR_opt, opt_stats, bfi, cwd=None):
+    def opt(cls, llvm_dir, opt_params,  IR, IR_pgouse, IR_opt, opt_stats, bfi, cwd=None):            
         if args.instrument_ir:
             cmd=f'opt -pgo-instr-gen -instrprof {IR} -o {IR_opt}'
             flag, ret = cls.runcmd(cmd, cwd)
@@ -271,7 +272,7 @@ class Clangopt:
             IR_pgouse = IR
         
         # cmd = os.path.join(llvm_dir,'opt')+' -enable-new-pm=0 {} {} -o {} -stats -stats-json 2> {}'.format(opt_params, opt_input, opt_output, opt_stats)
-        cmd = os.path.join(llvm_dir,'opt')+' {} {} -o {} -stats -stats-json 2> {}'.format(opt_params, IR_pgouse, IR_opt, opt_stats)
+        cmd = os.path.join(llvm_dir,'opt')+' -enable-new-pm=0 {} {} -o {} -stats -stats-json 2> {}'.format(opt_params, IR_pgouse, IR_opt, opt_stats)
         flag, ret = cls.runcmd(cmd, cwd)
         if not flag:
             os.remove(opt_stats)
@@ -292,7 +293,7 @@ class Clangopt:
         # cmd = os.path.join(llvm_dir,'llc')+'  -O3 {} -o {} --print-machine-bfi 2> {}'.format(IR_opt, asm, machinebfi)
         cmd = os.path.join(llvm_dir,'llc')+' -O3 -filetype=obj {} -o {}'.format(IR_opt, obj)
         flag, ret = cls.runcmd(cmd, cwd)
-        # assert flag == True, cmd
+        assert flag == True, cmd
         
         cp_cmd = f'cp {obj} {obj_cp}'
         ret = subprocess.run(cp_cmd, cwd=cwd, shell=True, capture_output=True)

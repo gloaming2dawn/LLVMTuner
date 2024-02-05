@@ -1,0 +1,6 @@
+/home/jiayu/Huawei_project/LLVMTuner/FuncNames/build/CMakeFiles/intrinsics_gen.dir
+/home/jiayu/Huawei_project/LLVMTuner/FuncNames/build/CMakeFiles/omp_gen.dir
+/home/jiayu/Huawei_project/LLVMTuner/FuncNames/build/CMakeFiles/acc_gen.dir
+/home/jiayu/Huawei_project/LLVMTuner/FuncNames/build/CMakeFiles/FuncNames.dir
+/home/jiayu/Huawei_project/LLVMTuner/FuncNames/build/CMakeFiles/edit_cache.dir
+/home/jiayu/Huawei_project/LLVMTuner/FuncNames/build/CMakeFiles/rebuild_cache.dir

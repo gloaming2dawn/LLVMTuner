@@ -15,6 +15,8 @@ import time
 import random
 import shutil
 from copy import deepcopy
+import llvmtuner
+from llvmtuner.gen_hotfiles import get_func_names
 
 
 
@@ -61,6 +63,26 @@ class Function_wrap:
         self.md5sums=[]
         self.best_y=inf
         self.result_file = os.path.join(self.tmp_dir, 'result.json')
+        # module2funcnames= self._get_func_names()
+        # print(module2funcnames)
+
+    def _get_func_names(self):
+        t0 = time.time()
+        flag = self.build('-O0')
+        assert flag
+        print(f'time of building under -O0:',time.time()-t0)
+        module2funcnames = {}
+        for name in os.listdir(self.tmp_dir):
+            if os.path.isdir(os.path.join(self.tmp_dir, name)) and name!='LLVMTuner-cfg':
+                fileroot=name
+                IR_dir=os.path.join(self.tmp_dir, fileroot, 'IR-{}/'.format( hashlib.md5('-O0'.encode('utf-8')).hexdigest()))
+                IR=os.path.join(IR_dir, fileroot +'.opt.bc')
+                funcnames = get_func_names(IR)
+                module2funcnames[fileroot]=funcnames
+        return module2funcnames
+
+
+
     
     # def run_and_eval(self):
     #     ret = subprocess.run('time ' + self.run_cmd, shell=True, cwd=self.run_dir, capture_output=True)
@@ -173,7 +195,7 @@ class Function_wrap:
         y=self.run_and_eval()
         if y == inf: 
             return inf
-        if y < 0.03: # y<0.03 means executation failed
+        if y < 0.05: # y<0.03 means executation failed
             return -inf
         else:
             y_list.append(y)
@@ -232,7 +254,10 @@ class Function_wrap:
                 md5sum=random.random()
                 
             if md5sum not in self.md5sums:
+                t0 = time.time()
                 y = self.measure()
+                print(f'time of measuring:',time.time()-t0)
+                t0 = time.time()
                 if y!=inf and y != -inf:
                     self.params.append(params)
                     self.y.append(y)
@@ -240,9 +265,7 @@ class Function_wrap:
                     self.best_params = self.params[np.argmin(self.y)]
                     self.best_y = min(self.y)
                     self.n_evals = len(self.y)
-                    
-                    print("{}) fbest = {:.4f} f_current = {:.4f}".format(self.n_evals, self.best_y, self.y[-1]))
-                    
+                                        
                     data = [cfg_path, y]
                     with open(self.result_file, 'a') as f:
                         f.write(json.dumps(data)+'\n')
@@ -257,6 +280,9 @@ class Function_wrap:
                         data = [self.best_params, self.best_y]
                         with open(best_result_file, 'a') as f:
                             f.write(json.dumps(data)+'\n')
+                    # print(f'time of saving results:',time.time()-t0)
+                    print("{}) fbest = {:.4f} f_current = {:.4f}".format(self.n_evals, self.best_y, self.y[-1]))
+
                 return y             
             else:
                 print('the same IR')
