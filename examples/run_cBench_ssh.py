@@ -38,7 +38,7 @@ parser.add_argument('--n-parallel', type=int,default=50, help='')
 parser.add_argument('--batch-size', type=int, default=1)
 args = parser.parse_args()
 
-passes=llvmtuner.searchspace.default_space()
+passes, O3_trans_seq=llvmtuner.searchspace.default_space()
 # passes=llvmtuner.searchspace.compilergym_space()
 passes.append('')
 
@@ -55,7 +55,7 @@ final_benchmarks=[]
 for benchmark in ben2hot:
     if len(ben2hot[benchmark])>1:
         final_benchmarks.append(benchmark)
-print(final_benchmarks)
+# print(final_benchmarks)
 
 for key, value in ben2hot.items():
     ben2hot[key] = [v + '.c' for v in value]
@@ -84,11 +84,12 @@ def run_and_eval_fun():
             try:
                 ret = sshC.put(local=os.path.join(ben_dir,'a.out'), remote=run_dir)
             except Exception as e:
-                assert 1==0
+                assert 1==0, [os.path.join(ben_dir,'a.out'), run_dir]
 
     try:
+        timeout_seconds = 5
         with sshC.cd(run_dir):
-            ret=sshC.run(run_cmd, hide=True, timeout=100)
+            ret=sshC.run(f'timeout {timeout_seconds} '+run_cmd, hide=True, timeout=timeout_seconds)
         temp=ret.stderr.strip()
         real=temp.split('\n')[-3]
         searchObj = re.search( r'real\s*(.*)m(.*)s.*', real)
@@ -97,6 +98,8 @@ def run_and_eval_fun():
         runtime = inf
     except invoke.exceptions.CommandTimedOut:
         runtime = inf
+        # kill_command = f"kill {remote_process_pid}"
+        # sshC.run(kill_command)
     return runtime 
 
 
@@ -115,7 +118,7 @@ t0=time.time()
 print('-----------------build -O3-----------------')
 fun_O3.build('-O3')
 print('O3 compilation time:',time.time()-t0)
-fun_O3('-O3')
+# fun_O3('-O3')
 
 # module2funcnames = fun_O3._get_func_names()
 # folded_perf_result = perf_record(sshC, ben_dir, run_dir, run_cmd)
@@ -148,13 +151,47 @@ def check_seq(seq):
 if __name__ == "__main__":
     if args.method == 'O1':
         f.hotfiles =allfiles
-        y = f('-O1')
-        
+        y = fun('-O1')
+    
+    if args.method == 'O2':
+        f.hotfiles =allfiles
+        y = fun('-O2')
+    
+    if args.method == 'O3_seq':
+        f.hotfiles =allfiles
+        y = fun(' '.join(O3_trans_seq))
+
     if args.method == 'O3':
         f.hotfiles =allfiles
-        y = f('-O3')
+        y = fun('-O3')
         # y = f("-mem2reg -div-rem-pairs -jump-threading -loop-unswitch -sroa -indvars -loop-rotate -instcombine -globalopt -tailcallelim -loop-idiom -loop-unroll -function-attrs -loop-deletion")
         # y = f("-mem2reg -div-rem-pairs -jump-threading -loop-unswitch -sroa -indvars -loop-rotate -instcombine -globalopt -tailcallelim -loop-idiom -loop-unroll -functionattrs -loop-deletion")
+    
+    if args.method == 'O3-random':
+        def random_params():
+            params={}
+            for filename in fun.hotfiles:
+                fileroot,fileext=os.path.splitext(filename)
+                seq=random.choices(passes, k=len_seq)
+                seq=check_seq(seq)
+                params[fileroot]='-O3 ' + ' '.join(seq)
+            return params
+        
+        params_list = []
+        for _ in range(args.budget):
+            params = random_params()
+            params_list.append(params)
+        
+        t0 = time.time()
+        with Pool(50) as p:
+            flags = p.map(fun.gen_optIR, params_list)
+        print(f'time of parallel generating {args.budget} optimized IRs:',time.time()-t0)
+        
+        for i in range(len(params_list)):
+            if flags[i]:
+                y = fun(params_list[i])
+        
+        print(f'{args.benchmark} {args.budget} iterations cost:',time.time()-t0)
 
 
     if args.method=='random':
@@ -179,7 +216,7 @@ if __name__ == "__main__":
         
         for i in range(len(params_list)):
             if flags[i]:
-                y = f(params_list[i])
+                y = fun(params_list[i])
         
         print(f'{args.benchmark} {args.budget} iterations cost:',time.time()-t0)
         
@@ -208,12 +245,33 @@ if __name__ == "__main__":
         
         for i in range(len(params_list)):
             if flags[i]:
-                y = f(params_list[i])
+                y = fun(params_list[i])
         print(f'{args.benchmark} {args.budget} iterations cost:',time.time()-t0)
 
+
+
+    if args.method=='one-by-one':
+        params={}
+        for filename in fun.hotfiles:
+            fileroot,fileext=os.path.splitext(filename)
+            params[fileroot] = '-O3'
+        y = fun(params)
+
+        for filename in fun.hotfiles:
+            fileroot,fileext=os.path.splitext(filename)
+            params=deepcopy(fun.best_params)
+            for _ in range(args.budget):
+                seq=random.choices(passes, k=len_seq)
+                seq=check_seq(seq)
+                params[fileroot]=' '.join(seq)
+                y = fun(deepcopy(params))
+            
+            
                 
         
+                
         
+    
     if args.method=='nevergrad':
         import nevergrad as ng
         import numpy as np
@@ -222,6 +280,7 @@ if __name__ == "__main__":
                 repetitions=len_seq,
                 deterministic=True
             )
+        
         optimizer=ng.optimizers.NGOpt(parametrization=params, budget=args.budget)
         print(optimizer._select_optimizer_cls())
         for i in range(args.budget):
@@ -229,7 +288,7 @@ if __name__ == "__main__":
             seq=list(x.value)
             seq=check_seq(seq)
             
-            y=f(' '.join(seq))
+            y=fun(' '.join(seq))
             if y != inf:
                 optimizer.tell(x, y)
             

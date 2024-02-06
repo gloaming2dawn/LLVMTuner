@@ -20,6 +20,7 @@ def default_space():
     O3_seq=string.split()
     O3_seq=[x for x in O3_seq if x != 'Pass' and x != 'Arguments:']    
     O3_trans_seq=[x for x in O3_seq if x not in analysis_passes]
+    # print('O3 seq',O3_trans_seq)
     other_passes='-attributor -break-crit-edges -loop-data-prefetch -loop-fusion -loop-reduce -loop-predication -loop-interchange -loop-simplifycfg -loop-unroll-and-jam -lowerinvoke -mergefunc -partial-inliner -sink -slsr -always-inline'.split()
     passes=list(set(O3_trans_seq + other_passes))
     # # print('O3 seq length:',len(O3_trans_seq), 'O3 transform pass number:',len(O3_trans_passes))
@@ -34,7 +35,7 @@ def default_space():
     #         print(x)
     # passes = passes + passes_Cbench
     passes = sorted(set(passes))
-    return passes
+    return passes,O3_trans_seq
 
 
 def compilergym_space():  
