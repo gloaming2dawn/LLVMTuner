@@ -52,10 +52,67 @@ import nevergrad as ng
 # from pymoo.core.evaluator import Evaluator
 # from pymoo.core.termination import NoTermination
 import llvmtuner
-from llvmtuner import searchspace
-from llvmtuner import globalvar
-from llvmtuner.feature_extraction import read_optstats_from_cfgjsonlist, stats2vec
+from llvmtuner.searchspace import default_space, passlist2str
+from llvmtuner.feature_extraction import read_optstats_from_cfgjsonlist, stats2vec, read_optstats_from_cfgpath
 
+def read_seq_json_from_subdirs(base_dir):
+    seq_strings = []  # 存储从seq.json文件中读取的字符串
+    # 遍历给定目录
+    for item in os.listdir(base_dir):
+        item_path = os.path.join(base_dir, item)
+        # 检查当前路径是否为文件夹
+        if os.path.isdir(item_path):
+            seq_file_path = os.path.join(item_path, 'seq.json')
+            # 尝试读取seq.json文件
+            try:
+                with open(seq_file_path, 'r', encoding='utf-8') as f:
+                    # 假设文件内容直接是一个字符串
+                    content = json.load(f)
+                    seq_strings.append(content)
+            except FileNotFoundError:
+                # seq.json文件不存在于当前子文件夹中
+                raise ValueError(f"Not found: {seq_file_path}")
+            except json.JSONDecodeError:
+                # seq.json文件内容不是有效的JSON，可能需要错误处理
+                raise ValueError(f"Error decoding JSON from file: {seq_file_path}")
+    
+    return seq_strings
+
+def permu_best(best_params, fileroot, opt_str):
+    cand_params = deepcopy(best_params)
+    cand_params[fileroot] = opt_str
+    return cand_params
+
+def permu_best_k(best_params, k, cands):
+    cand_params = deepcopy(best_params)
+    fileroots = random.sample(list(cand_params.keys()), k=k)
+    for fileroot in fileroots:
+        seqs = cands[fileroot]
+        opt_str = random.choice(seqs)
+        cand_params[fileroot] = opt_str
+    return cand_params
+
+
+def nonzero_rows(matrix, inds):
+    return matrix[:, inds].sum(axis=1)!=0
+
+def dict_changes(A, B):
+    changes = {}
+    
+    # 处理A和B中共同的key
+    for key in A.keys() & B.keys():
+        if A[key] != B[key]:
+            changes[key] = (A[key], B[key])
+    
+    # 处理只在A中存在的key
+    for key in A.keys() - B.keys():
+        changes[key] = (A[key], 0)
+    
+    # 处理只在B中存在的key
+    for key in B.keys() - A.keys():
+        changes[key] = (0, B[key])
+    
+    return changes
 
 class params2vec:
     def __init__(self, seq2vec):
@@ -68,23 +125,7 @@ class params2vec:
         x = np.concatenate(x)
         return x
 
-def permu_best(best_params, fileroot, opt_str):
-    cand_params = deepcopy(best_params)
-    cand_params[fileroot] = opt_str
-    return cand_params
 
-
-def check_seq(seq):
-    cgprofile_count = seq.count('-cg-profile')
-    if cgprofile_count>1:
-        for _ in range(cgprofile_count-1):
-            index = seq.index('-cg-profile')
-            seq[index] = ''
-    return seq
-
-
-def nonzero_rows(matrix, inds):
-    return matrix[:, inds].sum(axis=1)!=0
 
 
 
@@ -118,13 +159,15 @@ class BO:
         fun,
         len_seq,
         budget, 
-        passes=llvmtuner.searchspace.default_space(),
+        passes,
+        precompiled_path=None, # path that contains a large number of precompiled IR and their optimization configs
         n_parallel=50,
         n_init=20,
         max_cand_seqs = 1000,
         batch_size=1,
         acqf='UCB', # 'EI' or 'UCB'
         beta=1.96, # only useful when acq=UCB, used to trade off exploration and exploitation
+        failtol=50,
         # n_init_acq=512,
         # max_acq_size=128,
         # n_restarts_acq=1,
@@ -198,6 +241,15 @@ class BO:
             fileroot,fileext=os.path.splitext(filename)
             self.cands[fileroot]=[]
         
+        self.precompiled_path = precompiled_path
+        if precompiled_path is not None:
+            assert precompiled_path == self.tmp_dir, "precompiled IRs should be put into tmp_dir"
+            for filename in self.fun.hotfiles:
+                fileroot,fileext=os.path.splitext(filename)
+                self.cands[fileroot]=read_seq_json_from_subdirs(os.path.join(precompiled_path, fileroot))
+                
+            
+        
         
         self.new_seqs= []
         self.seq_next, self.fX_next = '', inf
@@ -206,7 +258,8 @@ class BO:
         
         self.failcount = 0
         self.succcount = 0
-        self.failtol = 2000
+        self.failtol = failtol
+        self.k = len(self.fun.hotfiles)
 
         self.initialization = True
 
@@ -237,19 +290,21 @@ class BO:
     
     
     
-    def _update_failcount(self, fX_next):
-        if np.min(fX_next) < np.min(self.fX) - 1e-3 * math.fabs(np.min(self.fX)):
+    def update_k(self, fX_next):
+        if np.min(fX_next) < self.best_y - 1e-3 * math.fabs(self.best_y):
             self.failcount = 0
             self.succcount +=1
         else:
             self.failcount += self.batch_size
             self.succcount = 0
             
-        if self.succcount == 3:
-            self.length = min([2.0 * self.length, 0.5])
-            self.succcount = 0
+        # if self.succcount == 3:
+        #     self.length = min([2.0 * self.length, 0.5])
+        #     self.succcount = 0
+
         if self.failcount > self.failtol:
-            self.length /= 2   
+            self.k = max([int(self.k/2), 1]) 
+            self.failcount = 0 
             
     
     
@@ -267,9 +322,9 @@ class BO:
             new_cands[fileroot]=[]
             for _ in range(self.heristics['random']):
                 seq=random.choices(self.passes, k=self.len_seq)
-                seq=check_seq(seq)
-                if seq not in self.cands[fileroot]:
-                    new_cands[fileroot].append(' '.join(seq))
+                opt_str = passlist2str(seq)
+                if opt_str not in self.cands[fileroot]:
+                    new_cands[fileroot].append(opt_str)
         
         
         # for _ in range(self.heristics['DE']):
@@ -308,34 +363,6 @@ class BO:
         if self.verbose:
             print("Opt {} candidates cost {:.4f}".format(len(params_list), time()-t0))        
             
-        # def worker(seq, return_dict):
-        #     return_dict[seq] = self.gen_ir_fun(seq)
-        
-        # return_dict = Manager().dict()
-        # procs = []
-        
-        # for seq in new_cand_seqs:
-        #     p = Process(target=worker, args=(seq,  return_dict))
-        #     procs.append(p)
-        
-        # chunked_procs_list = []
-        # for i in range(0, len(procs), self.n_parallel):
-        #     chunked_procs_list.append(procs[i:i+self.n_parallel])
-        # for chunked_procs in chunked_procs_list:
-        #     for p in chunked_procs:
-        #         p.start()
-        #     for p in chunked_procs:
-        #         p.join()
-
-        # new_seqs = []
-        
-        # for seq in new_cand_seqs:
-        #     if return_dict[seq]:
-        #         new_seqs.append(seq)
-        #     else:
-        #         print('failed compilation')
-        
-        # return  new_seqs
     
     
     
@@ -429,8 +456,9 @@ class BO:
     
     
     
-        
+    
     def tell(self, params_next, fX_next):
+        self.update_k(fX_next)
         self.n_evals += 1
         self.fX.append(fX_next)
         self.params_list.append(params_next)
@@ -484,7 +512,7 @@ class BO:
     #         x.append(vec)
     #     x = np.array(x).flatten()
     #     return x
-    
+
     # @staticmethod
     def cands2vecs(self, cands):
         vecs_dict = {}
@@ -501,6 +529,7 @@ class BO:
             t0 = time()
             stats_list = read_optstats_from_cfgjsonlist(cfg_json_list)
             x = zip(stats_list, seqs)
+            # 去除失败的seq
             filtered_stats, filtered_seqs = zip(*[(stat, seq) for stat, seq in zip(stats_list, seqs) if stat is not None])
             seqs = list(filtered_seqs)
             stats_list = list(filtered_stats)
@@ -521,8 +550,10 @@ class BO:
         t0 = time()
         self.cands, self.vecs_dict, self.feature_names = self.cands2vecs(self.cands)
         self.seq2vec = {}
+        self.file2feature_names = {}
         for fileroot in self.cands:
             self.seq2vec[fileroot] = dict(zip(self.cands[fileroot],self.vecs_dict[fileroot]))
+            self.file2feature_names[fileroot] = [x for x in self.feature_names if x.startswith(fileroot)]
         if self.verbose:
             print("Feature_extraction cost {:.4f}".format(time()-t0))
         return self.seq2vec
@@ -535,13 +566,18 @@ class BO:
         self.failcount = 0
         
         # firstly build the program in '-O3'
-        assert self.build_fun('-O3')
+        assert self.build_fun('default<O3>')
         
         # Initialization
         initial_params_list = []
         ii=0
+        initial_params = {} 
         if self.initial_guess is None:
-            ii=0
+            ii=1
+            for filename in self.fun.hotfiles:
+                fileroot,fileext=os.path.splitext(filename)
+                initial_params[fileroot]='default<O3>'
+
         else:
             ii=1
             initial_params={}
@@ -551,22 +587,43 @@ class BO:
                     initial_params[fileroot]=self.initial_guess
             else:
                 initial_params = self.initial_guess
-            initial_params_list.append(initial_params)
-            self.initial_guess=None
+
+        initial_params_list.append(initial_params)
+        # self.initial_guess=None
         
-        for _ in range(self.n_init - ii):
-            seq=random.choices(self.passes, k=self.len_seq)
-            seq=check_seq(seq)
-            params={}
-            for filename in self.fun.hotfiles:
-                fileroot,fileext=os.path.splitext(filename)
-                opt_str=' '.join(seq)
-                params[fileroot]=opt_str
-                if opt_str not in self.cands[fileroot]:
-                    self.cands[fileroot].append(opt_str)
-            if params not in initial_params_list:
-                initial_params_list.append(params)
+        # fX_next = self.fun(initial_params)
+        # assert fX_next != inf
+        # self.tell(initial_params, fX_next)
+        # if fX_next != inf:
+        #     self.tell(params, fX_next)
             
+            
+        
+        for _ in range(self.n_init-ii):
+            if self.precompiled_path is None:
+                seq=random.choices(self.passes, k=self.len_seq)
+                opt_str = passlist2str(seq)
+                params={}
+                for filename in self.fun.hotfiles:
+                    fileroot,fileext=os.path.splitext(filename)
+                    params[fileroot]=opt_str
+                    if opt_str not in self.cands[fileroot]:
+                        self.cands[fileroot].append(opt_str)
+                if params not in initial_params_list:
+                    initial_params_list.append(params)
+            else:
+                params={}
+                for filename in self.fun.hotfiles:
+                    fileroot,fileext=os.path.splitext(filename)
+                    seq=random.choice(self.cands[fileroot])
+                    params[fileroot] = seq
+                    if params not in initial_params_list:
+                        initial_params_list.append(params)
+                    # params = permu_best(self.best_params, fileroot, seq)
+                    # fX_next = self.fun(params)
+                    # if fX_next != inf:
+                    #     self.tell(params, fX_next)
+        
         
         
         print('len_init_samples:',len(initial_params_list))
@@ -586,36 +643,42 @@ class BO:
 
         
         # print('cost time:', time()-t0)
-        new_cands = self.ask()
-        if new_cands is not None:
-            self.genIR_and_update(new_cands)
-            new_cands, _, _ = self.cands2vecs(new_cands)
-            for fileroot in self.cands:
-                self.cands[fileroot].extend(new_cands[fileroot])
-        self.feature_extraction()
-        while self.n_evals < self.budget:
-            
-            # ask new candidates
+        if self.precompiled_path is None:
             new_cands = self.ask()
-            
             if new_cands is not None:
-                # generate optimized IRs parallely and update
                 self.genIR_and_update(new_cands)
                 new_cands, _, _ = self.cands2vecs(new_cands)
                 for fileroot in self.cands:
                     self.cands[fileroot].extend(new_cands[fileroot])
-                # extract features
-                self.feature_extraction()
+                    
+        self.feature_extraction()
+
+        while self.n_evals < self.budget:
+            if self.precompiled_path is None:
+                # ask new candidates
+                new_cands = self.ask()
+                
+                if new_cands is not None:
+                    # generate optimized IRs parallely and update
+                    self.genIR_and_update(new_cands)
+                    new_cands, _, _ = self.cands2vecs(new_cands)
+                    for fileroot in self.cands:
+                        self.cands[fileroot].extend(new_cands[fileroot])
+                    # extract features
+                    self.feature_extraction()
 
 
             # prepare candidates for the next evaluation
-            if self.n_evals <200:
-                k = 200 #later
-            else:
-                k = 100
-            n_cands=len(list(self.cands.values())[0])
-            if k > n_cands:
-                k = n_cands
+            # if self.n_evals <200:
+            #     q = 200 #later
+            # else:
+            #     q = 100
+
+            # q = 200*len(self.fun.hotfiles)
+            q = 500
+            # n_cands=len(list(self.cands.values())[0])
+            # if q > n_cands:
+            #     q = n_cands
             
             
             cand_params_list = []
@@ -630,20 +693,23 @@ class BO:
             #     if params not in self.params_list:
             #         cand_params_list.append(params)
 
-            for fileroot in self.cands:
-                if new_cands is not None:
-                    seqs = new_cands[fileroot] + random.sample(self.cands[fileroot], k=k)
-                else:
-                    seqs = random.sample(self.cands[fileroot], k=k)
+            # for _ in range(q):
+            #     params = permu_best_k(self.best_params, self.k, self.cands)
+            #     if params not in self.params_list and params not in cand_params_list:
+            #         cand_params_list.append(params)
+
+            for fileroot in self.cands:#
+                n_cands=len(self.cands[fileroot])
+                if q > n_cands:
+                    q = n_cands
+                seqs = random.sample(self.cands[fileroot], k=q)
                 for seq in seqs:
                     params = permu_best(self.best_params, fileroot, seq)
                     if params not in self.params_list:
                         cand_params_list.append(params)
-                    
-                # with Pool() as p:
-                #     perm_params_list_single = p.starmap(permu_best, itertools.product([self.best_params],[fileroot], seqs))
-                # cand_params_list.extend(perm_params_list_single) #later
-            print('permu_best cost:',time()-t0)
+            
+
+            # print('permu_best cost:',time()-t0)
             
             
             
@@ -667,9 +733,10 @@ class BO:
 
             # with Pool() as p:
             #     self.X = p.map(params2vec(self.seq2vec), self.params_list)
-            if self.verbose:
-                print('params2vec cost:',time()-t0)
-             
+
+            # if self.verbose:
+            #     print('params2vec cost:',time()-t0)
+            
 
 
             # train GP
@@ -697,8 +764,8 @@ class BO:
             print('Num of unexplored features:',len(unexplored_feature_names))
             mask = nonzero_rows(np.array(cand_X), inds) #later
             # acq_values[mask] = acq_values[mask] + 1000
-            if np.random.rand() > 0.5:
-                acq_values[mask] = acq_values[mask] + 1000
+            if np.random.rand() > 0.3:
+                acq_values[mask] = acq_values[mask] + 10000
             
             
             # select one sample from all candidates and evaluate them
@@ -706,7 +773,40 @@ class BO:
             for fileroot in params_next:
                 if params_next[fileroot] != self.best_params[fileroot]:
                     print(fileroot)
+                    if fX_next<self.best_y:
+                        previous_vec = self.seq2vec[fileroot][self.best_params[fileroot]]
+                        vec = self.seq2vec[fileroot][params_next[fileroot]]
+                        changes = {}
+                        for key, value1, value2 in zip(self.file2feature_names[fileroot], previous_vec, vec):
+                            changes[key] = (round(value1, 2), round(value2, 2))
+                            # if value1 != value2:
+                            #     # changes[key] = (value1, value2)
+                            #     changes[key] = (round(value1, 2), round(value2, 2))
+                        print(json.dumps(changes))#,indent=4
+                    # for key, value in changes.items():
+                    #     print(f"{key}: {value}")
                     
+
+                    # previous_cfgpath= os.path.join(self.fun.cfg_dir, 'cfg-{}.json'.format( hashlib.md5(str(self.best_params).encode('utf-8')).hexdigest()) )
+                    # previous_features = read_optstats_from_cfgpath(previous_cfgpath)
+                    # previous_changed_features = {}
+                    # for key in previous_features:
+                    #     if key.startswith(fileroot):
+                    #         previous_changed_features[key]=previous_features[key]
+
+                    # cfgpath= os.path.join(self.fun.cfg_dir, 'cfg-{}.json'.format( hashlib.md5(str(params_next).encode('utf-8')).hexdigest()) )
+                    # features = read_optstats_from_cfgpath(cfgpath)
+                    # changed_features = {}
+                    # for key in features:
+                    #     if key.startswith(fileroot):
+                    #         changed_features[key]=features[key]
+                    # changes_original = dict_changes(previous_changed_features, changed_features)
+
+                    
+                    # # for key, value in changes.items():
+                    # #     print(f"{key}: {value}")
+                    # print(json.dumps(changes))#,indent=4
+
             # update heristics
             self.tell(params_next, fX_next)
             
@@ -721,6 +821,9 @@ class BO:
         # print final results
         # print('results are saved to {}', self.result_file)
         # print('the best reult are saved to {}', self.best_result_file)
+
+if __name__ == '__main__':
+    pass
             
 
                 

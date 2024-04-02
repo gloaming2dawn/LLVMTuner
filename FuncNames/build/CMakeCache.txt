@@ -224,10 +224,16 @@ LIBXML2_LIBRARY:FILEPATH=/usr/lib/x86_64-linux-gnu/libxml2.so
 LIBXML2_XMLLINT_EXECUTABLE:FILEPATH=/usr/bin/xmllint
 
 //The directory containing a CMake configuration file for LLVM.
-LLVM_DIR:PATH=/home/jiayu/llvm16.0.0/lib/cmake/llvm
+LLVM_DIR:PATH=/home/jiayu/llvm17.0.6/lib/cmake/llvm
 
 //LLVM installation directory
-LT_LLVM_INSTALL_DIR:PATH=/home/jiayu/llvm16.0.0
+LT_LLVM_INSTALL_DIR:PATH=/home/jiayu/17.0.6
+
+//Path to a file.
+LibEdit_INCLUDE_DIRS:PATH=/usr/include
+
+//Path to a library.
+LibEdit_LIBRARIES:FILEPATH=/usr/lib/x86_64-linux-gnu/libedit.so
 
 //Arguments to supply to pkg-config
 PKG_CONFIG_ARGN:STRING=
@@ -257,7 +263,19 @@ llvm-tutor-hello-world_IS_TOP_LEVEL:STATIC=ON
 llvm-tutor-hello-world_SOURCE_DIR:STATIC=/home/jiayu/Huawei_project/LLVMTuner/FuncNames
 
 //Path to a library.
+pkgcfg_lib_PC_LIBEDIT_edit:FILEPATH=/usr/lib/x86_64-linux-gnu/libedit.so
+
+//Path to a library.
 pkgcfg_lib_PC_LIBXML_xml2:FILEPATH=/usr/lib/x86_64-linux-gnu/libxml2.so
+
+//Path to a file.
+zstd_INCLUDE_DIR:PATH=/usr/include
+
+//Path to a library.
+zstd_LIBRARY:FILEPATH=/usr/lib/x86_64-linux-gnu/libzstd.so
+
+//Path to a library.
+zstd_STATIC_LIBRARY:FILEPATH=/usr/lib/x86_64-linux-gnu/libzstd.a
 
 
 ########################
@@ -409,18 +427,63 @@ CMAKE_STRIP-ADVANCED:INTERNAL=1
 CMAKE_UNAME:INTERNAL=/usr/bin/uname
 //ADVANCED property for variable: CMAKE_VERBOSE_MAKEFILE
 CMAKE_VERBOSE_MAKEFILE-ADVANCED:INTERNAL=1
+//Details about finding LibEdit
+FIND_PACKAGE_MESSAGE_DETAILS_LibEdit:INTERNAL=[/usr/include][/usr/lib/x86_64-linux-gnu/libedit.so][v2.11()]
 //Details about finding LibXml2
 FIND_PACKAGE_MESSAGE_DETAILS_LibXml2:INTERNAL=[/usr/lib/x86_64-linux-gnu/libxml2.so][/usr/include/libxml2][v2.9.10()]
 //Details about finding Terminfo
 FIND_PACKAGE_MESSAGE_DETAILS_Terminfo:INTERNAL=[/usr/lib/x86_64-linux-gnu/libtinfo.so][1][v()]
 //Details about finding ZLIB
 FIND_PACKAGE_MESSAGE_DETAILS_ZLIB:INTERNAL=[/usr/lib/x86_64-linux-gnu/libz.so][/usr/include][v1.2.11()]
+//Details about finding zstd
+FIND_PACKAGE_MESSAGE_DETAILS_zstd:INTERNAL=[/usr/lib/x86_64-linux-gnu/libzstd.so][/usr/include][v()]
+//Have include histedit.h
+HAVE_HISTEDIT_H:INTERNAL=1
 //ADVANCED property for variable: LIBXML2_INCLUDE_DIR
 LIBXML2_INCLUDE_DIR-ADVANCED:INTERNAL=1
 //ADVANCED property for variable: LIBXML2_LIBRARY
 LIBXML2_LIBRARY-ADVANCED:INTERNAL=1
 //ADVANCED property for variable: LIBXML2_XMLLINT_EXECUTABLE
 LIBXML2_XMLLINT_EXECUTABLE-ADVANCED:INTERNAL=1
+//ADVANCED property for variable: LibEdit_INCLUDE_DIRS
+LibEdit_INCLUDE_DIRS-ADVANCED:INTERNAL=1
+//ADVANCED property for variable: LibEdit_LIBRARIES
+LibEdit_LIBRARIES-ADVANCED:INTERNAL=1
+PC_LIBEDIT_CFLAGS:INTERNAL=-I/usr/include/editline
+PC_LIBEDIT_CFLAGS_I:INTERNAL=
+PC_LIBEDIT_CFLAGS_OTHER:INTERNAL=
+PC_LIBEDIT_FOUND:INTERNAL=1
+PC_LIBEDIT_INCLUDEDIR:INTERNAL=/usr/include
+PC_LIBEDIT_INCLUDE_DIRS:INTERNAL=/usr/include/editline
+PC_LIBEDIT_LDFLAGS:INTERNAL=-L/usr/lib/x86_64-linux-gnu;-ledit
+PC_LIBEDIT_LDFLAGS_OTHER:INTERNAL=
+PC_LIBEDIT_LIBDIR:INTERNAL=/usr/lib/x86_64-linux-gnu
+PC_LIBEDIT_LIBRARIES:INTERNAL=edit
+PC_LIBEDIT_LIBRARY_DIRS:INTERNAL=/usr/lib/x86_64-linux-gnu
+PC_LIBEDIT_LIBS:INTERNAL=
+PC_LIBEDIT_LIBS_L:INTERNAL=
+PC_LIBEDIT_LIBS_OTHER:INTERNAL=
+PC_LIBEDIT_LIBS_PATHS:INTERNAL=
+PC_LIBEDIT_MODULE_NAME:INTERNAL=libedit
+PC_LIBEDIT_PREFIX:INTERNAL=/usr
+PC_LIBEDIT_STATIC_CFLAGS:INTERNAL=-I/usr/include/editline
+PC_LIBEDIT_STATIC_CFLAGS_I:INTERNAL=
+PC_LIBEDIT_STATIC_CFLAGS_OTHER:INTERNAL=
+PC_LIBEDIT_STATIC_INCLUDE_DIRS:INTERNAL=/usr/include/editline
+PC_LIBEDIT_STATIC_LDFLAGS:INTERNAL=-L/usr/lib/x86_64-linux-gnu;-ledit;-ltermcap;-lbsd
+PC_LIBEDIT_STATIC_LDFLAGS_OTHER:INTERNAL=
+PC_LIBEDIT_STATIC_LIBDIR:INTERNAL=
+PC_LIBEDIT_STATIC_LIBRARIES:INTERNAL=edit;termcap;bsd
+PC_LIBEDIT_STATIC_LIBRARY_DIRS:INTERNAL=/usr/lib/x86_64-linux-gnu
+PC_LIBEDIT_STATIC_LIBS:INTERNAL=
+PC_LIBEDIT_STATIC_LIBS_L:INTERNAL=
+PC_LIBEDIT_STATIC_LIBS_OTHER:INTERNAL=
+PC_LIBEDIT_STATIC_LIBS_PATHS:INTERNAL=
+PC_LIBEDIT_VERSION:INTERNAL=3.1
+PC_LIBEDIT_libedit_INCLUDEDIR:INTERNAL=
+PC_LIBEDIT_libedit_LIBDIR:INTERNAL=
+PC_LIBEDIT_libedit_PREFIX:INTERNAL=
+PC_LIBEDIT_libedit_VERSION:INTERNAL=
 PC_LIBXML_CFLAGS:INTERNAL=-I/usr/include/libxml2
 PC_LIBXML_CFLAGS_I:INTERNAL=
 PC_LIBXML_CFLAGS_OTHER:INTERNAL=
@@ -474,9 +537,19 @@ ZLIB_LIBRARY_DEBUG-ADVANCED:INTERNAL=1
 ZLIB_LIBRARY_RELEASE-ADVANCED:INTERNAL=1
 //linker supports push/pop state
 _CMAKE_LINKER_PUSHPOP_STATE_SUPPORTED:INTERNAL=TRUE
+__pkg_config_arguments_PC_LIBEDIT:INTERNAL=QUIET;libedit
 __pkg_config_arguments_PC_LIBXML:INTERNAL=QUIET;libxml-2.0
+__pkg_config_checked_PC_LIBEDIT:INTERNAL=1
 __pkg_config_checked_PC_LIBXML:INTERNAL=1
+//ADVANCED property for variable: pkgcfg_lib_PC_LIBEDIT_edit
+pkgcfg_lib_PC_LIBEDIT_edit-ADVANCED:INTERNAL=1
 //ADVANCED property for variable: pkgcfg_lib_PC_LIBXML_xml2
 pkgcfg_lib_PC_LIBXML_xml2-ADVANCED:INTERNAL=1
 prefix_result:INTERNAL=/usr/lib/x86_64-linux-gnu
+//ADVANCED property for variable: zstd_INCLUDE_DIR
+zstd_INCLUDE_DIR-ADVANCED:INTERNAL=1
+//ADVANCED property for variable: zstd_LIBRARY
+zstd_LIBRARY-ADVANCED:INTERNAL=1
+//ADVANCED property for variable: zstd_STATIC_LIBRARY
+zstd_STATIC_LIBRARY-ADVANCED:INTERNAL=1
 

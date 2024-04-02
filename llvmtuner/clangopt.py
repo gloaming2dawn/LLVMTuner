@@ -47,8 +47,8 @@ class Clangopt:
         初始化功能：（1）使用clang的-MJ命令生成compilation database；（2）从compilation database中获取编译信息
         '''
         if not args.opt_cfg_json:
-            self.params='-O3'
-            self.tmp_dir='./tmp'
+            self.params='default<O3>'
+            self.tmp_dir=os.path.join(os.path.expanduser('~/'), './tmp/')
             self.hotfiles=None
         else:
             # 判断配置文件是否存在
@@ -112,7 +112,7 @@ class Clangopt:
         
         
         
-            
+        
         IR_dir=os.path.join(self.tmp_dir, fileroot, 'IR-{}/'.format( hashlib.md5(opt_str.encode('utf-8')).hexdigest()))
         os.makedirs(IR_dir, exist_ok=True)
         
@@ -148,13 +148,28 @@ class Clangopt:
             flag = self.opt(args.llvm_dir, opt_str, IR, IR_pgouse, IR_opt, opt_stats, bfi)
             assert flag
             # if not flag:
+            #     IR_dir=os.path.join(self.tmp_dir, fileroot, 'IR-{}/'.format( hashlib.md5('default<O3>'.encode('utf-8')).hexdigest()))
+            #     IR_opt = os.path.join(IR_dir,fileroot+'.opt.bc')
+            # return flag
+        
+            # if not flag:
             #     flag = self.opt(args.llvm_dir, '-O3', IR, IR_pgouse, IR_opt, opt_stats, bfi)
             #     assert flag
         
-        if not args.gen_ir:
-            
-            flag = self.IR2obj(args.llvm_dir, IR_opt, obj, obj_cp, cflags, cwd=directory)
-            assert flag
+        if not args.gen_ir: #
+            if not os.path.isfile(obj_cp):
+                flag = self.IR2obj(args.llvm_dir, IR_opt, obj, obj_cp, cflags, cwd=directory)
+                assert flag
+            else:
+                cp_cmd = f'cp {obj_cp} {obj}'
+                ret = subprocess.run(cp_cmd, cwd=directory, shell=True, capture_output=True)
+                assert ret.returncode == 0
+        else:
+            if not os.path.isfile(obj_cp):
+                flag = self.IR2obj(args.llvm_dir, IR_opt, obj_cp, None, cflags, cwd=directory)
+                assert flag
+
+        return True
             # if not flag:
             #     flag = self.opt(args.llvm_dir, '-O3', IR, IR_pgouse, IR_opt, opt_stats, bfi)
             #     assert flag
@@ -162,7 +177,7 @@ class Clangopt:
             #     assert flag
     
     def _compile(self):
-        
+        final_flag=True
         # 如果该命令为链接obj文件生成二进制
         if self.cdb == None:
             if not args.gen_ir:
@@ -170,6 +185,7 @@ class Clangopt:
                     link_cmd = ' '.join(self.clang_cmd) + ' -fprofile-generate'
                 else:
                     link_cmd = ' '.join(self.clang_cmd)
+                print(link_cmd)
                 ret = subprocess.run(link_cmd, shell=True, capture_output=True)
                 assert ret.returncode == 0, link_cmd
                 # if '-o' in self.clang_cmd:
@@ -190,11 +206,15 @@ class Clangopt:
                     # fileroot,fileext=os.path.splitext(filename)
                     if filename in self.hotfiles:
                         flag = self._single_compile(x)
+                        if not flag:
+                            final_flag=False
                         # 改变源文件时间戳保证下次仍然会重新编译
                         Path(x['file']).touch()
             else:
                 for x in self.cdb:
                     flag = self._single_compile(x)
+                    if not flag:
+                        final_flag=False
                     # 改变源文件时间戳保证下次仍然会重新编译
                     Path(x['file']).touch()
             
@@ -216,7 +236,6 @@ class Clangopt:
                     link_cmd = f'{link_cmd_wo_objs} {objs_str} -fprofile-generate'
                 else:
                     link_cmd = f'{link_cmd_wo_objs} {objs_str}'
-                # print(link_cmd)
                 ret = subprocess.run(link_cmd, shell=True, capture_output=True)
                 assert ret.returncode == 0, link_cmd
                 
@@ -272,15 +291,15 @@ class Clangopt:
             IR_pgouse = IR
         
         # cmd = os.path.join(llvm_dir,'opt')+' -enable-new-pm=0 {} {} -o {} -stats -stats-json 2> {}'.format(opt_params, opt_input, opt_output, opt_stats)
-        cmd = os.path.join(llvm_dir,'opt')+' -enable-new-pm=0 {} {} -o {} -stats -stats-json 2> {}'.format(opt_params, IR_pgouse, IR_opt, opt_stats)
+        cmd = f'{os.path.join(llvm_dir,"opt")} -passes="{opt_params}" {IR_pgouse} -o {IR_opt} -stats -stats-json 2> {opt_stats}'
         flag, ret = cls.runcmd(cmd, cwd)
         if not flag:
             os.remove(opt_stats)
         # os.remove(IR_pgouse)
-        assert flag == True, cmd
         os.remove(IR)
+        assert flag == True, cmd
         return flag
-            
+    
     
     @classmethod
     def IR2obj(cls, llvm_dir, IR_opt, obj, obj_cp, cflags, cwd=None):
@@ -295,9 +314,10 @@ class Clangopt:
         flag, ret = cls.runcmd(cmd, cwd)
         assert flag == True, cmd
         
-        cp_cmd = f'cp {obj} {obj_cp}'
-        ret = subprocess.run(cp_cmd, cwd=cwd, shell=True, capture_output=True)
-        assert ret.returncode == 0
+        if obj_cp != None:
+            cp_cmd = f'cp {obj} {obj_cp}'
+            ret = subprocess.run(cp_cmd, cwd=cwd, shell=True, capture_output=True)
+            assert ret.returncode == 0
         
         return flag
     

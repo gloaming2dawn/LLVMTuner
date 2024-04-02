@@ -74,6 +74,7 @@ preinstall:
 clean: CMakeFiles/intrinsics_gen.dir/clean
 clean: CMakeFiles/omp_gen.dir/clean
 clean: CMakeFiles/acc_gen.dir/clean
+clean: CMakeFiles/RISCVTargetParserTableGen.dir/clean
 clean: CMakeFiles/FuncNames.dir/clean
 .PHONY : clean
 
@@ -154,6 +155,32 @@ acc_gen: CMakeFiles/acc_gen.dir/rule
 CMakeFiles/acc_gen.dir/clean:
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/acc_gen.dir/build.make CMakeFiles/acc_gen.dir/clean
 .PHONY : CMakeFiles/acc_gen.dir/clean
+
+#=============================================================================
+# Target rules for target CMakeFiles/RISCVTargetParserTableGen.dir
+
+# All Build rule for target.
+CMakeFiles/RISCVTargetParserTableGen.dir/all:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/RISCVTargetParserTableGen.dir/build.make CMakeFiles/RISCVTargetParserTableGen.dir/depend
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/RISCVTargetParserTableGen.dir/build.make CMakeFiles/RISCVTargetParserTableGen.dir/build
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --progress-dir=/home/jiayu/Huawei_project/LLVMTuner/FuncNames/build/CMakeFiles --progress-num= "Built target RISCVTargetParserTableGen"
+.PHONY : CMakeFiles/RISCVTargetParserTableGen.dir/all
+
+# Build rule for subdir invocation for target.
+CMakeFiles/RISCVTargetParserTableGen.dir/rule: cmake_check_build_system
+	$(CMAKE_COMMAND) -E cmake_progress_start /home/jiayu/Huawei_project/LLVMTuner/FuncNames/build/CMakeFiles 0
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 CMakeFiles/RISCVTargetParserTableGen.dir/all
+	$(CMAKE_COMMAND) -E cmake_progress_start /home/jiayu/Huawei_project/LLVMTuner/FuncNames/build/CMakeFiles 0
+.PHONY : CMakeFiles/RISCVTargetParserTableGen.dir/rule
+
+# Convenience name for target.
+RISCVTargetParserTableGen: CMakeFiles/RISCVTargetParserTableGen.dir/rule
+.PHONY : RISCVTargetParserTableGen
+
+# clean rule for target.
+CMakeFiles/RISCVTargetParserTableGen.dir/clean:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/RISCVTargetParserTableGen.dir/build.make CMakeFiles/RISCVTargetParserTableGen.dir/clean
+.PHONY : CMakeFiles/RISCVTargetParserTableGen.dir/clean
 
 #=============================================================================
 # Target rules for target CMakeFiles/FuncNames.dir

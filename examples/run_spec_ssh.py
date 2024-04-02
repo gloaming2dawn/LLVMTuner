@@ -52,7 +52,7 @@ def run_and_eval_fun():
         assert 1==0
 
     os.remove(os.path.join(ben_dir, binary))
-    
+
     
     
     myscript = f'run_{args.benchmark}.sh'

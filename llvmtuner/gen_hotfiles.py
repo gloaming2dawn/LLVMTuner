@@ -66,12 +66,12 @@ def find_elements_for_percent(data, threshold=0.95):
     x_filtered = []
 
     for item in percentages:
+        if cumulative_percentage >= threshold or item[1] < 0.03:
+            break
         cumulative_percentage += item[1]
         item.append(cumulative_percentage)
         elements_filtered.append(item)#
         x_filtered.append(item[0])
-        if cumulative_percentage >= threshold:
-            break
     return x_filtered,elements_filtered
 
 def gen_hotfiles(module2funcnames, binary_name, folded_perf_result):
@@ -90,7 +90,7 @@ def gen_hotfiles(module2funcnames, binary_name, folded_perf_result):
     hotfiles,elements_filtered = find_elements_for_percent(module2cost, threshold=0.95)
     for item in elements_filtered:
         print(f"{item[0]}: {item[1]*100:.2f}%, {item[2]*100:.2f}%")
-    return hotfiles
+    return hotfiles,elements_filtered
             
 
 

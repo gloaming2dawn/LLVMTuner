@@ -4,7 +4,7 @@
 # compile CXX with /usr/bin/c++
 CXX_DEFINES = -DFuncNames_EXPORTS
 
-CXX_INCLUDES = -isystem /home/jiayu/llvm16.0.0/include
+CXX_INCLUDES = -isystem /home/jiayu/llvm17.0.6/include
 
 CXX_FLAGS =  -fno-rtti -fPIC -std=gnu++17
 

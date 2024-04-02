@@ -17,6 +17,9 @@ import shutil
 from copy import deepcopy
 import llvmtuner
 from llvmtuner.gen_hotfiles import get_func_names
+from llvmtuner.searchspace import passlist2str, parse_O3string, split_by_parentheses
+from llvmtuner.feature_extraction import read_optstats_from_cfgjson
+from llvmtuner.show_features import dict_changes
 
 
 
@@ -50,6 +53,8 @@ class Function_wrap:
         self.max_n_measure=max_n_measure
         self.adaptive_measure=adaptive_measure
         self.results={}
+        self.exe = ''
+        self.objs = {}
 
         
         
@@ -57,7 +62,7 @@ class Function_wrap:
         self.wrong_seqs = {} # for each file, there are wrong sequences
         self.wrong_params = [] # for the whole project, there are wrong params
         
-        self.params=[]
+        self.params_list=[]
         self.cfg_paths=[]
         self.y=[]
         self.md5sums=[]
@@ -68,14 +73,15 @@ class Function_wrap:
 
     def _get_func_names(self):
         t0 = time.time()
-        flag = self.build('-O0')
+        opt_str = 'default<O0>'
+        flag = self.build(opt_str)
         assert flag
         print(f'time of building under -O0:',time.time()-t0)
         module2funcnames = {}
         for name in os.listdir(self.tmp_dir):
             if os.path.isdir(os.path.join(self.tmp_dir, name)) and name!='LLVMTuner-cfg':
                 fileroot=name
-                IR_dir=os.path.join(self.tmp_dir, fileroot, 'IR-{}/'.format( hashlib.md5('-O0'.encode('utf-8')).hexdigest()))
+                IR_dir=os.path.join(self.tmp_dir, fileroot, 'IR-{}/'.format( hashlib.md5(opt_str.encode('utf-8')).hexdigest()))
                 IR=os.path.join(IR_dir, fileroot +'.opt.bc')
                 funcnames = get_func_names(IR)
                 module2funcnames[fileroot]=funcnames
@@ -123,17 +129,18 @@ class Function_wrap:
         cfg['params'] = params
         if self.hotfiles:
             cfg['hotfiles'] = self.hotfiles
-        opt_cfg_json= os.path.join(self.cfg_dir, 'cfg-{}.json'.format( hashlib.md5(str(params).encode('utf-8')).hexdigest()) )
-        with open(opt_cfg_json, 'w') as f:
+        cfgpath= os.path.join(self.cfg_dir, 'cfg-{}.json'.format( hashlib.md5(str(params).encode('utf-8')).hexdigest()) )
+        with open(cfgpath, 'w') as f:
             json.dump(cfg, f, indent=4)
         
         assert 'clangopt' in self.cmd
         if '"clangopt"' in self.cmd or "'clangopt'" in self.cmd:
-            build_cmd = self.cmd.replace('clangopt', 'clangopt --gen-ir --opt-cfg-json={} --profdata={}'.format(opt_cfg_json, self.profdata))
+            build_cmd = self.cmd.replace('clangopt', 'clangopt --gen-ir --opt-cfg-json={} --profdata={}'.format(cfgpath, self.profdata))
         else:
-            build_cmd = self.cmd.replace('clangopt', '"clangopt --gen-ir --opt-cfg-json={} --profdata={}"'.format(opt_cfg_json, self.profdata))
+            build_cmd = self.cmd.replace('clangopt', '"clangopt --gen-ir --opt-cfg-json={} --profdata={}"'.format(cfgpath, self.profdata))
         
         ret = subprocess.run(build_cmd, shell=True, capture_output=True, cwd =self.build_dir)
+        
         if ret.returncode != 0:
             print('cmd failed:',build_cmd)
             return False
@@ -144,50 +151,81 @@ class Function_wrap:
         cfg['tmp_dir'] = self.tmp_dir
         cfg['params'] = params
         cfg['hotfiles'] = self.hotfiles
-        opt_cfg_json= os.path.join(self.cfg_dir, 'cfg-{}.json'.format( hashlib.md5(str(params).encode('utf-8')).hexdigest()) )
-        with open(opt_cfg_json, 'w') as f:
+        cfgpath= os.path.join(self.cfg_dir, 'cfg-{}.json'.format( hashlib.md5(str(params).encode('utf-8')).hexdigest()) )
+        with open(cfgpath, 'w') as f:
             json.dump(cfg, f, indent=4)
         
         assert 'clangopt' in self.cmd
         if '"clangopt"' in self.cmd or "'clangopt'" in self.cmd or self.cmd.startswith('clangopt'):
             if self.is_genprofdata:
-                build_cmd = self.cmd.replace('clangopt', f'clangopt --opt-cfg-json={opt_cfg_json} --profdata={self.profdata} --instrument-ir')
+                build_cmd = self.cmd.replace('clangopt', f'clangopt --opt-cfg-json={cfgpath} --profdata={self.profdata} --instrument-ir')
             else:
-                build_cmd = self.cmd.replace('clangopt', f'clangopt --opt-cfg-json={opt_cfg_json} --profdata={self.profdata}')            
+                build_cmd = self.cmd.replace('clangopt', f'clangopt --opt-cfg-json={cfgpath} --profdata={self.profdata}')            
         else:
             if self.is_genprofdata:
-                build_cmd = self.cmd.replace('clangopt', f'"clangopt --opt-cfg-json={opt_cfg_json} --profdata={self.profdata} --instrument-ir"')
+                build_cmd = self.cmd.replace('clangopt', f'"clangopt --opt-cfg-json={cfgpath} --profdata={self.profdata} --instrument-ir"')
             else:
-                build_cmd = self.cmd.replace('clangopt', f'"clangopt --opt-cfg-json={opt_cfg_json} --profdata={self.profdata}"')
+                build_cmd = self.cmd.replace('clangopt', f'"clangopt --opt-cfg-json={cfgpath} --profdata={self.profdata}"')
         
         
         ret = subprocess.run(build_cmd, shell=True, capture_output=True, cwd =self.build_dir)
+        # print(ret)
         if ret.returncode != 0:
             print('cmd failed:',build_cmd)
             return False
         return True
     
-    def reduce_pass(self, pass_seq_str):
-        pass_seq = pass_seq_str.split() 
-        print(f'start reducing {pass_seq}')
-        seq=deepcopy(pass_seq)
-        y_ref=self.__call__(' '.join(pass_seq))
-        change=False
-        for i in range(len(pass_seq)):
-            seq[i]=''
+    def reduce_pass(self, params0):
+        def reduce_pass_single(params1, fileroot):
+            params=deepcopy(params1)
+            y_ref=self.__call__(params)
+            change=False
+            opt_str = params[fileroot]
+            pass_seq = parse_O3string(opt_str)
+            seq=deepcopy(pass_seq)            
+            for i in range(len(pass_seq)):
+                seq[i]=''
+                seq0=[x for x in seq if x !='']
+                params[fileroot] = passlist2str(seq0)
+                best = self.best_y
+                best_params = self.best_params
+                y=self.__call__(params)
+                if y > best*1.007:
+                    seq[i]=pass_seq[i]
+                    pass_clear_name = split_by_parentheses(pass_seq[i])[-1].split('<')[0]
+                    print(f'pass {pass_clear_name} is good for {fileroot}, from {y} to {best}')
+                else:
+                    print(fileroot,len(seq0))
+                    change=True
+                    if y*1.02 < best:
+                        print(f'pass {pass_clear_name} is bad for {fileroot}, from {y} to {best}')
+                        cfg0={}
+                        cfg1={}
+                        cfg0['params']=best_params 
+                        cfg1['params']=params
+                        cfg0['tmp_dir']=self.tmp_dir
+                        cfg1['tmp_dir']=self.tmp_dir
+                        cfg_json0=json.dumps(cfg0)
+                        cfg_json1=json.dumps(cfg1)
+                        features0 = read_optstats_from_cfgjson(cfg_json0)
+                        features1 = read_optstats_from_cfgjson(cfg_json1)
+                        changes = dict_changes(features0, features1)
+                        for key in sorted(changes.keys()):
+                            print(f"{key}: {changes[key]}")
+
+
             seq0=[x for x in seq if x !='']
-            
-            y=self.__call__(' '.join(seq0))
-            if y > self.best_y*1.007:
-                seq[i]=pass_seq[i]
-            else:
-                print(' '.join(seq0),len(seq0))
-                change=True  
-                
-        seq0=[x for x in seq if x !='']
-        if change==True:
-            seq0, y_ref=self.reduce_pass(' '.join(seq0))
-        return seq0, y_ref
+            params[fileroot] = passlist2str(seq0)
+            if change==True:
+                print(f'restart reducing {fileroot}')
+                params, y_ref=reduce_pass_single(params, fileroot)
+            return params, y_ref
+
+        for filename in self.hotfiles:
+            fileroot,fileext=os.path.splitext(filename)
+            print(f'start reducing {fileroot}')
+            params0, y_ref = reduce_pass_single(params0, fileroot)
+        return params0, y_ref
     
     
     def measure(self):
@@ -196,7 +234,7 @@ class Function_wrap:
         if y == inf: 
             return inf
         if y < 0.05: # y<0.03 means executation failed
-            return -inf
+            return inf
         else:
             y_list.append(y)
             if self.adaptive_measure:
@@ -221,10 +259,10 @@ class Function_wrap:
     
     def __call__(self, params):
         t0 = time.time()
-        if params in self.params:
+        if params in self.params_list:
             print('the same sequence')
-            return self.y[self.params.index(params)]
-        
+            return self.y[self.params_list.index(params)]
+
 
         flag = self.build(params)
         print(f'time of building:',time.time()-t0)
@@ -234,7 +272,7 @@ class Function_wrap:
             profdata = self.gen_profdata()
             shutil.rmtree(self.cfg_dir)
             return profdata
-        
+
         if flag:
             hashobj = hashlib.md5()
             if self.hotfiles is not None:
@@ -259,10 +297,10 @@ class Function_wrap:
                 print(f'time of measuring:',time.time()-t0)
                 t0 = time.time()
                 if y!=inf and y != -inf:
-                    self.params.append(params)
+                    self.params_list.append(deepcopy(params))
                     self.y.append(y)
                     self.md5sums.append(md5sum)
-                    self.best_params = self.params[np.argmin(self.y)]
+                    self.best_params = self.params_list[np.argmin(self.y)]
                     self.best_y = min(self.y)
                     self.n_evals = len(self.y)
                                         

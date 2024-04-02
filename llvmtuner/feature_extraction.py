@@ -19,82 +19,115 @@ possible_rbun=['early-cse.NumSimplify', 'gvn.NumGVNEqProp', 'gvn.NumGVNInstr', '
 
 
 #通过gen_llvm_transform_stats_key.py自动获取的pass_stats_keys，当前仅在LLVM10测试
-pass_stats_keys = ['SLP.NumVectorInstructions', #
-                   'adce.NumBranchesRemoved', 'adce.NumRemoved', 
-                   'alignment-from-assumptions.NumLoadAlignChanged', 'alignment-from-assumptions.NumMemIntAlignChanged', 'alignment-from-assumptions.NumStoreAlignChanged',
-                   'argpromotion.NumAggregatesPromoted', 'argpromotion.NumArgumentsDead', 'argpromotion.NumArgumentsPromoted', 'argpromotion.NumByValArgsPromoted',
-                   'attributor.NumAttributesFixedDueToRequiredDependences', 'attributor.NumAttributesManifested', 'attributor.NumAttributesTimedOut', 'attributor.NumAttributesValidFixpoint', 'attributor.NumFnWithExactDefinition', 'attributor.NumFnWithoutExactDefinition',
-                   'bdce.NumRemoved', 'bdce.NumSimplified', 
-                   'block-extractor.NumExtracted',
-                   'break-crit-edges.NumBroken',
-                   'build-libcalls.NumArgMemOnly', 'build-libcalls.NumNoAlias', 'build-libcalls.NumNoCapture', 'build-libcalls.NumNoUnwind', 'build-libcalls.NumNonNull', 'build-libcalls.NumReadNone', 'build-libcalls.NumReadOnly', 'build-libcalls.NumReadOnlyArg', 'build-libcalls.NumReturnedArg',
-                   'callsite-splitting.NumCallSiteSplit',
-                   'consthoist.NumConstantsHoisted', 
-                   'constmerge.NumIdenticalMerged',
-                   'constprop.NumInstKilled',
-                   'correlated-value-propagation.NumAShrs', 'correlated-value-propagation.NumAddNSW', 'correlated-value-propagation.NumAddNUW', 'correlated-value-propagation.NumAddNW', 'correlated-value-propagation.NumAnd', 'correlated-value-propagation.NumCmps', 'correlated-value-propagation.NumDeadCases', 'correlated-value-propagation.NumMemAccess', 'correlated-value-propagation.NumMulNSW', 'correlated-value-propagation.NumMulNUW', 'correlated-value-propagation.NumMulNW', 'correlated-value-propagation.NumNSW', 'correlated-value-propagation.NumNUW', 'correlated-value-propagation.NumNW', 'correlated-value-propagation.NumOverflows', 'correlated-value-propagation.NumPhiCommon', 'correlated-value-propagation.NumPhis', 'correlated-value-propagation.NumReturns', 'correlated-value-propagation.NumSDivs', 'correlated-value-propagation.NumSExt', 'correlated-value-propagation.NumSRems', 'correlated-value-propagation.NumSaturating', 'correlated-value-propagation.NumSelects', 'correlated-value-propagation.NumShlNSW', 'correlated-value-propagation.NumShlNUW', 'correlated-value-propagation.NumShlNW', 'correlated-value-propagation.NumSubNSW', 'correlated-value-propagation.NumSubNUW', 'correlated-value-propagation.NumSubNW', 'correlated-value-propagation.NumUDivs',
-                   'dce.DCEEliminated', 'dce.DIEEliminated', 
-                   'deadargelim.NumArgumentsEliminated', 'deadargelim.NumArgumentsReplacedWithUndef', 'deadargelim.NumRetValsEliminated', 
-                   'div-rem-pairs.NumDecomposed', 'div-rem-pairs.NumHoisted', 'div-rem-pairs.NumRecomposed', 
-                   'dse.NumFastOther', 'dse.NumFastStores', 'dse.NumModifiedStores', 'dse.NumRedundantStores', 
-                   'early-cse.NumCSE', 'early-cse.NumSimplify', 
-                   'elim-avail-extern.NumFunctions', 'elim-avail-extern.NumVariables', 
-                   'functionattrs.NumNoAlias', 'functionattrs.NumNoCapture', 'functionattrs.NumNoFree', 'functionattrs.NumNoRecurse', 'functionattrs.NumNoUnwind', 'functionattrs.NumNonNullReturn', 'functionattrs.NumReadNone', 'functionattrs.NumReadNoneArg', 'functionattrs.NumReadOnly', 'functionattrs.NumReadOnlyArg', 'functionattrs.NumReturned', 'functionattrs.NumWriteOnly', 
-                   'globaldce.NumAliases', 'globaldce.NumFunctions', 'globaldce.NumIFuncs', 'globaldce.NumVFuncs', 'globaldce.NumVariables', 
-                   'globalopt.NumAliasesRemoved', 'globalopt.NumAliasesResolved', 'globalopt.NumCXXDtorsRemoved', 'globalopt.NumColdCC', 'globalopt.NumDeleted', 'globalopt.NumFastCallFns', 'globalopt.NumGlobUses', 'globalopt.NumHeapSRA', 'globalopt.NumLocalized', 'globalopt.NumMarked', 'globalopt.NumNestRemoved', 'globalopt.NumSRA', 'globalopt.NumShrunkToBool', 'globalopt.NumSubstitute', 'globalopt.NumUnnamed', 
-                   'gvn-hoist.NumCallsHoisted', 'gvn-hoist.NumCallsRemoved', 'gvn-hoist.NumHoisted', 'gvn-hoist.NumLoadsHoisted', 'gvn-hoist.NumLoadsRemoved', 'gvn-hoist.NumRemoved', 'gvn-hoist.NumStoresHoisted', 'gvn-hoist.NumStoresRemoved', 
-                   'gvn-sink.NumRemoved', 
-                   'gvn.NumGVNBlocks', 'gvn.NumGVNEqProp', 'gvn.NumGVNInstr', 'gvn.NumGVNLoad', 'gvn.NumGVNPRE', 'gvn.NumGVNSimpl', 'gvn.NumPRELoad',
-                   'hotcoldsplit.NumColdRegionsOutlined', 
-                   'indvars.NumElimCmp', 'indvars.NumElimExt', 'indvars.NumElimIV', 'indvars.NumElimIdentity', 'indvars.NumElimOperand', 'indvars.NumElimRem', 'indvars.NumFoldedUser', 'indvars.NumLFTR', 'indvars.NumReplaced', 'indvars.NumSimplifiedSDiv', 'indvars.NumSimplifiedSRem', 'indvars.NumWidened', 
-                   'inline.NumCallsDeleted', 'inline.NumDeleted', 'inline.NumInlined', 'inline.NumMergedAllocas', 
-                   'instcombine.NumCombined', 'instcombine.NumConstProp', 'instcombine.NumDeadInst', 'instcombine.NumDeadStore', 'instcombine.NumExpand', 'instcombine.NumFactor', 'instcombine.NumGlobalCopies', 'instcombine.NumReassoc', 'instcombine.NumSel', 'instcombine.NumSimplified', 'instcombine.NumSunkInst', 
-                   'instsimplify.NumSimplified', 
-                   'internalize.NumAliases', 'internalize.NumFunctions', 'internalize.NumGlobals', 
-                   'ipconstprop.NumArgumentsProped', 'ipconstprop.NumReturnValProped', 
-                   'jump-threading.NumDupes', 'jump-threading.NumFolds', 'jump-threading.NumThreads', 
-                   'lcssa.NumLCSSA', 
-                   'libcalls-shrinkwrap.NumWrappedOneCond', 'libcalls-shrinkwrap.NumWrappedTwoCond', 
-                   'licm.NumClonedBranches', 'licm.NumCreatedBlocks', 'licm.NumHoisted', 'licm.NumMovedCalls', 'licm.NumMovedLoads', 'licm.NumPromoted', 'licm.NumSunk', 
-                   'load-store-vectorizer.NumScalarsVectorized', 'load-store-vectorizer.NumVectorInstructions', 
-                   'local.NumRemoved', 
-                   'loop-data-prefetch.NumPrefetches', 
-                   'loop-delete.NumDeleted', 
-                   'loop-distribute.NumLoopsDistributed', 
-                   'loop-extract.NumExtracted', 
-                   'loop-fusion.FuseCounter',
-                   'loop-idiom.NumMemSet', 
-                   'loop-instsimplify.NumSimplified', 
-                   'loop-interchange.LoopsInterchanged', 
-                   'loop-load-elim.NumLoopLoadEliminted', 
-                   'loop-predication.TotalWidened', 
-                   'loop-rotate.NumRotated', 
-                   'loop-simplify.NumNested', 
-                   'loop-simplifycfg.NumLoopBlocksDeleted', 'loop-simplifycfg.NumLoopExitsDeleted', 'loop-simplifycfg.NumTerminatorsFolded', 
-                   'loop-unroll-and-jam.NumCompletelyUnrolledAndJammed', 'loop-unroll-and-jam.NumUnrolledAndJammed', 
-                   'loop-unroll.NumCompletelyUnrolled', 'loop-unroll.NumPeeled', 'loop-unroll.NumRuntimeUnrolled', 'loop-unroll.NumUnrolled', 'loop-unroll.NumUnrolledWithHeader', 
-                   'loop-unswitch.NumBranches', 'loop-unswitch.NumGuards', 'loop-unswitch.NumSelects', 'loop-unswitch.NumSimplify', 'loop-unswitch.NumSwitches', 'loop-unswitch.NumTrivial', 
-                   'loop-vectorize.LoopsVectorized', 
-                   'loopsink.NumLoopSunk', 'loopsink.NumLoopSunkCloned', 
-                   'lower-expect-intrinsic.ExpectIntrinsicsHandled',
-                   'lower-is-constant-intrinsic.IsConstantIntrinsicsHandled', 'lower-is-constant-intrinsic.ObjectSizeIntrinsicsHandled', 
-                   'lowerinvoke.NumInvokes', 
-                   'mem2reg.NumPromoted', 'mem2reg.NumDeadAlloca', 'mem2reg.NumLocalPromoted', 'mem2reg.NumPHIInsert', 'mem2reg.NumSingleStore',
-                   'memcpyopt.NumCpyToSet', 'memcpyopt.NumMemCpyInstr', 'memcpyopt.NumMemSetInfer', 'memcpyopt.NumMoveToCpy', 
-                   'mergefunc.NumAliasesWritten', 'mergefunc.NumDoubleWeak', 'mergefunc.NumFunctionsMerged', 'mergefunc.NumThunksWritten',
-                   'partial-inlining.NumColdOutlinePartialInlined', 'partial-inlining.NumColdRegionsOutlined', 'partial-inlining.NumPartialInlined',
-                   'prune-eh.NumRemoved', 'prune-eh.NumUnreach', 
-                   'reassociate.NumChanged', 'reassociate.NumAnnihil', 'reassociate.NumFactor', 
-                   'sample-profile.NumCSInlined', 'sample-profile.NumCSNotInlined', 
-                   'sccp.IPNumArgsElimed', 'sccp.IPNumInstRemoved', 'sccp.NumInstRemoved', 'sccp.IPNumGlobalConst'
-                   'simple-loop-unswitch.NumBranches', 'simple-loop-unswitch.NumSwitches', 
-                   'simplifycfg.NumBitMaps', 'simplifycfg.NumLinearMaps', 'simplifycfg.NumLookupTables', 'simplifycfg.NumSimpl', 'simplifycfg.NumSinkCommons', 'simplifycfg.NumSpeculations', 
-                   'sink.NumSunk',
-                   'spec-phis.NumEdgesSplit', 'spec-phis.NumNewRedundantInstructions', 'spec-phis.NumPHIsSpeculated', 'spec-phis.NumSpeculatedInstructions',
-                   'sroa.NumAllocaPartitionUses', 'sroa.NumAllocaPartitions', 'sroa.NumDeleted', 'sroa.NumLoadsSpeculated', 'sroa.NumNewAllocas', 'sroa.NumPromoted', 'sroa.NumVectorized', 
-                   'strip-dead-prototypes.NumDeadPrototypes', 
-                   'tailcallelim.NumAccumAdded', 'tailcallelim.NumEliminated']
+features = {'dse':'NumRedundantStores NumFastStores NumFastOther NumCompletePartials NumModifiedStores',
+            
+            'licm':'NumCreatedBlocks NumClonedBranches NumSunk NumHoisted NumMovedLoads NumMovedCalls NumLoadPromoted NumLoadStorePromoted NumMinMaxHoisted NumGEPsHoisted NumAddSubHoisted',
+            
+            'loop-idiom':'NumMemSet NumMemCpy NumMemMove',
+            
+            'adce':'NumRemoved NumBranchesRemoved', 
+            
+            'loop-delete':'NumDeleted',
+            
+            'constraint-elimination':'NumCondsRemoved',
+            
+            'gvn':'NumGVNInstr NumGVNLoad NumGVNPRE NumGVNBlocks NumGVNSimpl NumGVNEqProp NumPRELoad NumPRELoopLoad NumPRELoadMoved2CEPred',
+            
+            'indvars':'NumWidened NumReplaced NumLFTR NumElimExt NumElimIV NumElimIdentity NumElimOperand NumFoldedUser NumElimRem NumSimplifiedSDiv NumSimplifiedSRem NumElimCmp',
+            
+            'early-cse':'NumSimplify NumCSE NumCSECVP NumCSELoad NumCSECall NumDSE',
+            
+            'correlated-value-propagation': 'NumPhis NumPhiCommon NumSelects NumMemAccess NumCmps NumReturns NumDeadCases NumSDivSRemsNarrowed NumSDivs NumUDivURemsNarrowed NumAShrsConverted NumAShrsRemoved NumSRems NumSExt NumSICmps NumAnd NumNW NumNSW NumNUW NumAddNW NumAddNSW NumAddNUW NumSubNW NumSubNSW NumSubNUW NumMulNW NumMulNSW NumMulNUW NumShlNW NumShlNSW NumShlNUW NumAbs NumOverflows NumSaturating NumNonNull NumMinMax NumUDivURemsNarrowedExpanded',
+            
+            'jump-threading': 'NumThreads NumFolds NumDupes',
+            
+            'reassociate': 'NumChanged NumAnnihil NumFactor',
+            
+            'loop-interchange': 'LoopsInterchanged',
+            
+            'simple-loop-unswitch': 'NumBranches NumSwitches NumSelects NumGuards NumTrivial NumInvariantConditionsInjected',
+            
+            'loop-simplifycfg': 'NumTerminatorsFolded NumLoopBlocksDeleted NumLoopExitsDeleted',
+            
+            'memcpyopt': 'NumMemCpyInstr NumMemSetInfer NumMoveToCpy NumCpyToSet NumCallSlot',
+            
+            'sccp': 'NumInstRemoved NumInstReplaced NumArgsElimed NumGlobalConst',
+            
+            'bdce': 'NumRemoved NumSimplified NumSExt2ZExt',
+            
+            'simplifycfg':'NumSimpl',
+            
+            'loop-instsimplify':'NumSimplified',
+            
+            'loop-load-elim':'NumLoopLoadEliminted',
+            
+            'sroa':'NumAllocaPartitions NumNewAllocas NumPromoted NumLoadsSpeculated NumLoadsPredicated NumStoresPredicated NumDeleted NumVectorized',
+            
+            'callsite-splitting':'NumCallSiteSplit',
 
+            'div-rem-pairs': 'NumPairs',
+
+            'sink': 'NumSunk',
+
+            'loop-fusion': 'FuseCounter',
+
+            'tailcallelim':'NumEliminated',
+
+            'loop-rotate':'NumRotated',
+
+            'loop-unroll':'NumUnrolled NumCompletelyUnrolled NumUnrolledNotLatch NumRuntimeUnrolled',
+
+            'simplifycfg':'NumSimpl NumBitMaps NumLinearMaps NumLookupTables NumFoldValueComparisonIntoPredecessors NumFoldBranchToCommonDest NumHoistCommonInstrs NumSinkCommonInstrs NumInvokes NumInvokesMerged NumInvokeSetsFormed',
+
+            'libcalls-shrinkwrap':'NumWrappedOneCond NumWrappedTwoCond',
+
+            'mem2reg':'NumPromoted NumLocalPromoted NumSingleStore NumDeadAlloca NumPHIInsert',
+
+            'break-crit-edges':'NumBroken',
+
+            'loop-peel':'NumPeeled',
+
+            'lcssa':'NumLCSSA',
+
+            'local':'NumRemoved NumPHICSEs',
+
+            'build-libcalls': 'NumReadNone NumInaccessibleMemOnly NumReadOnly NumWriteOnly NumArgMemOnly NumInaccessibleMemOrArgMemOnly NumNoUnwind NumNoCapture NumWriteOnlyArg NumReadOnlyArg NumNoAlias NumNoUndef NumReturnedArg NumWillReturn',
+            
+            'loop-simplify':'NumNested',
+
+            'aggressive-instcombine':'NumExprsReduced NumInstrsReduced NumAnyOrAllBitsSet NumGuardedRotates NumGuardedFunnelShifts',
+
+            'instcombine': 'NumDeadStore NumGlobalCopies NumSel NumWorklistIterations NumCombined  NumConstProp NumDeadInst  NumSunkInst  NumExpand NumFactor    NumReassoc   NumSimplified NumPHIsOfInsertValues NumPHIsOfExtractValues NumPHICSEs NumAggregateReconstructionsSimplified NegatorNumTreesNegated NegatorNumInstructionsCreatedTotal NegatorNumInstructionsNegatedSuccess',
+
+            'globalopt': 'NumMarked NumUnnamed NumSRA NumSubstitute NumDeleted NumGlobUses   NumLocalized  NumShrunkToBool   NumFastCallFns    NumCtorsEvaluated NumNestRemoved    NumAliasesResolved NumAliasesRemoved NumCXXDtorsRemoved NumInternalFunc NumColdCC',
+
+            'elim-avail-extern':'NumRemovals NumConversions NumVariables',
+
+            'inline':'NumInlined NumDeleted',
+
+            'function-attrs': 'NumMemoryAttr NumNoCapture NumReturned NumReadNoneArg NumReadOnlyArg NumWriteOnlyArg NumNoAlias NumNonNullReturn NumNoRecurse NumNoUnwind NumNoFree NumWillReturn NumNoSync NumThinLinkNoRecurse NumThinLinkNoUnwind',
+
+            'argpromotion':'NumArgumentsPromoted NumArgumentsDead',
+
+            'globaldce':'NumAliases NumFunctions NumIFuncs NumVariables NumVFuncs',
+
+            'constmerge':'NumIdenticalMerged',
+
+            'deadargelim':'NumArgumentsEliminated NumRetValsEliminated NumArgumentsReplacedWithPoison',
+
+            'vector-combine':'NumVecLoad NumVecCmp NumVecBO NumVecCmpBO NumShufOfBitcast NumScalarBO NumScalarCmp',
+
+            'loop-vectorize':'LoopsVectorized LoopsEpilogueVectorized',
+
+            'SLP':'NumVectorInstructions'
+            }
+
+pass_stats_keys = []
+for key in features:
+    fks = features[key].split()
+    for fk in fks:
+        pass_stats_keys.append(key+'.'+fk)
+pass_stats_keys = sorted(pass_stats_keys)
 
 
 # def read_optstats(stats_file):
@@ -220,6 +253,7 @@ def read_optstats_from_cfgpathlist(cfg_path_list, n_parallel = None):
     return stats_list
 
 
+        
 def read_optstats_from_cfgjson(cfg_json):
     cfg = json.loads(cfg_json)
     new_stats={}
@@ -262,17 +296,18 @@ def stats2vec(stats_list):
     maxv=vector.max(axis=0)
     maxv[maxv==0]=1
     vector=vector/maxv
+    vector_initial = vector
     
     weights = np.zeros_like(maxv)
     feature_names = v.get_feature_names_out()
-    coarse_names = ['.'.join(x.split('.')[:-1]) for x in feature_names]
-    for name in np.unique(coarse_names):
-        mask = (coarse_names==np.array(name))
-        w = np.sqrt(1/mask.sum())
-        weights[mask] = w
-    assert not np.any(weights == 0)
-    vector_initial = vector
-    vector = vector*weights
+    # coarse_names = ['.'.join(x.split('.')[:-1]) for x in feature_names]
+    # for name in np.unique(coarse_names):
+    #     mask = (coarse_names==np.array(name))
+    #     w = np.sqrt(1/mask.sum())
+    #     weights[mask] = w
+    # assert not np.any(weights == 0)
+    # vector = vector*weights
+
     # Scaler = MinMaxScaler()
     # vector = Scaler.fit_transform(vector)
     return vector_initial, feature_names

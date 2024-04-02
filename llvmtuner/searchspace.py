@@ -4,122 +4,283 @@ Created on Fri Feb 11 00:12:22 2022
 
 @author: jiayu
 """
-
+import time
 import subprocess
 import os
-from llvmtuner import globalvar
+import re
+import json
+from copy import deepcopy
 
-analysis_passes=['-callgraph','-lcg','-module-summary','-no-op-module','-profile-summary','-stack-safety','-verify','-pass-instrumentation','-asan-globals-md','-inline-advisor','-ir-similarity','-no-op-cgscc','-fam-proxy', '-pass-instrumentation','-aa','-assumptions','-block-freq','-branch-prob','-domtree','-postdomtree','-demanded-bits','-domfrontier','-func-properties','-loops','-lazy-value-info','-da','-inliner-size-estimator','-memdep','-memoryssa','-phi-values','-regions','-no-op-function','-opt-remark-emit','-scalar-evolution','-stack-safety-local','-targetlibinfo','-basicaa','-targetir','-pass-instrumentation','-basic-aa','-cfl-anders-aa','-cfl-steens-aa','-objc-arc-aa','-scev-aa','-scoped-noalias-aa','-tbaa','-no-op-loop','-access-info','-ddg','-iv-users','-pass-instrumentation','-transform-warning','-domtree','-profile-summary-info','-scalar-evolution','-lcssa-verification','-lazy-block-freq','-demanded-bits','-basiccg', '-loop-accesses','-globals-aa','-lazy-branch-prob','-opt-remark-emitter','-tti','-tbaa','-scoped-noalias', '-scoped-noalias-aa','-assumption-cache-tracker','-targetlibinfo','-verify','-lazy-block-freq']
+def parse_O3string(s, operator=None):
+    result = []
+    i = 0
+    current = ""
+    while i < len(s):
+        if s[i] == ',':
+            if current:
+                result.append(current)
+                current = ""
+            i += 1
+            continue
+        elif s[i] == '(':
+            # Find the matching closing parenthesis
+            open_paren = 1
+            start = i
+            while i < len(s) - 1 and open_paren != 0:
+                i += 1
+                if s[i] == '(':
+                    open_paren += 1
+                elif s[i] == ')':
+                    open_paren -= 1
+            # Process the content within the parentheses
+            nested_result = parse_O3string(s[start + 1:i], current)
+            # result.extend(nested_result)
+            for item in nested_result:
+                result.append(f"{current}({item})")
+            current = ""
+        else:
+            current += s[i]
+        i += 1
+    # Add any remaining elements
+    if current:
+        result.append(current)
+    return result
+
+def split_by_parentheses(s):
+    stack = []  # 用于追踪圆括号
+    result = []  # 最终结果列表
+    current = []  # 当前处理的字符集合
+
+    for char in s:
+        if char == '(':
+            if current:  # 当前字符集合非空时，加入结果列表
+                result.append(''.join(current))
+                current = []  # 重置当前字符集合
+            stack.append('(')  # 开启新的圆括号
+        elif char == ')':
+            if stack:
+                stack.pop()  # 移除匹配的开启圆括号
+                if not stack:  # 如果堆栈为空，说明当前圆括号闭合
+                    result.append(''.join(current))
+                    current = []  # 重置当前字符集合
+            else:  # 无匹配的开启圆括号，直接添加字符
+                current.append(char)
+        else:
+            current.append(char)
+
+    # 添加最后一段字符，如果有的话
+    if current:
+        result.append(''.join(current))
+
+    return result
+
+
+def parse_nested_string(s):
+    """解析嵌套的字符串为结构化列表"""
+    stack = [[]]
+    current = ""
+    for char in s:
+        if char == '(':
+            if current:
+                stack[-1].append(current)
+                current = ""
+            stack.append([])
+        elif char == ')':
+            if current:
+                stack[-1].append(current)
+                current = ""
+            nested = stack.pop()
+            stack[-1].append(nested)
+        else:
+            current += char
+    if current:
+        stack[-1].append(current)
+    return stack[0]
+
+def build_nested_string(items):
+    
+    assert isinstance(items, list)
+    if len(items) == 1:
+        if isinstance(items[0], str):
+            return(items[0])
+        else:
+            assert isinstance(items[0], list)
+            nested = build_nested_string(items[0])
+            return(nested)
+    else:
+        if isinstance(items[0], str):
+            assert len(items) == 2
+            assert isinstance(items[1], list)
+            nested = build_nested_string(items[1])
+            return(f"{items[0]}({nested})") # 加上圆括号表示嵌套
+        else:
+            result = []
+            for item in items:
+                assert isinstance(item, list)
+                result.append(build_nested_string(item))
+            return ','.join(result)
+
+
+def merge_nested_lists(a, b):
+    """合并结构化列表"""
+    assert len(b)<3 and not isinstance(b[0], list)
+    if isinstance(a[0], list):
+        return a[:-1]+ merge_nested_lists(a[-1], b)
+    elif len(a) == 1 or len(b) == 1 or a[0]!=b[0]:
+        return [a, b]
+    else:
+        assert len(a) == 2
+        return [[a[0],merge_nested_lists(a[1], b[1])]]
+    
+
+def check_seq(seq0):
+    seq = deepcopy(seq0)
+    #只允许一个cg-profile出现   
+    cgprofile_count = 0
+    for i in range(len(seq) - 1, -1, -1):
+        pass0_name = split_by_parentheses(seq[i])[-1]
+        if pass0_name == 'cg-profile':
+            cgprofile_count += 1
+        if cgprofile_count > 1:
+            seq[i] = ''
+            cgprofile_count -= 1
+
+    seq = [s for s in seq if s != '']
+
+    #不允许连续重复pass  
+    for i in range(len(seq) - 1):
+        pass0_name = split_by_parentheses(seq[i])[-1]
+        pass1_name = split_by_parentheses(seq[i+1])[-1]
+        if pass0_name == pass1_name:
+            seq[i] = ''
+    seq = [s for s in seq if s != '']
+    return seq
+
+def passlist2str(seq):
+    seq = check_seq(seq)
+    sa = parse_nested_string(seq[0])
+    for i in range(len(seq)-1):
+        sa = merge_nested_lists(sa, parse_nested_string(seq[i+1]))
+    result = build_nested_string(sa)
+    return result
+
+def gen_kind2pass(filename):
+    with open(filename, 'r') as file:
+        content_dict = {}
+        current_key = None
+        for line in file:
+            stripped_line = line.strip()
+            # 如果行是空的，就跳过
+            if not stripped_line:
+                continue
+            # 检查行是否有缩进
+            if line[0].isspace():
+                # 如果当前键不是None，将缩进的行添加到对应的键下
+                if current_key is not None:
+                    content_dict[current_key].append(stripped_line.split('<')[0])
+            else:
+                # 这行没有缩进，是一个新的键
+                current_key = stripped_line
+                content_dict[current_key] = []
+    return content_dict
+
+
 
 def default_space():
-    cmd='llvm-as < /dev/null | opt -enable-new-pm=0 -O3 -disable-output -debug-pass=Arguments 2> O3_debug_passes.txt'
-    # cmd='llvm-as < /dev/null | opt -O3 -disable-output -debug-pass=Arguments 2> O3_debug_passes.txt'
+    cmd ='llvm-as < /dev/null | opt -O3 -disable-output --print-pipeline-passes > O3_debug_passes.txt'
     subprocess.run(cmd, shell=True)
     with open('O3_debug_passes.txt', 'r') as f:
-        string=f.read()
-    O3_seq=string.split()
-    O3_seq=[x for x in O3_seq if x != 'Pass' and x != 'Arguments:']    
-    O3_trans_seq=[x for x in O3_seq if x not in analysis_passes]
-    # print('O3 seq',O3_trans_seq)
-    other_passes='-attributor -break-crit-edges -loop-data-prefetch -loop-fusion -loop-reduce -loop-predication -loop-interchange -loop-simplifycfg -loop-unroll-and-jam -lowerinvoke -mergefunc -partial-inliner -sink -slsr -always-inline'.split()
-    passes=list(set(O3_trans_seq + other_passes))
-    # # print('O3 seq length:',len(O3_trans_seq), 'O3 transform pass number:',len(O3_trans_passes))
-    # os.remove('O3_debug_passes.txt')
-    # passes = sorted(passes)
+        O3_string=f.read()
+    O3_seq = parse_O3string(O3_string)
+    result = passlist2str(O3_seq)
+    # print(result == O3_string)
+
+    # print('='*20)
+    # print(json.dumps(O3_seq, indent=2))
     
-    # passes=['-adce', '-aggressive-instcombine', '-alignment-from-assumptions', '-always-inline', '-argpromotion', '-attributor', '-barrier', '-bdce', '-break-crit-edges', '-called-value-propagation', '-callsite-splitting', '-constmerge', '-correlated-propagation', '-deadargelim', '-div-rem-pairs', '-dse', '-early-cse', '-early-cse-memssa', '-ee-instrument', '-elim-avail-extern', '-float2int', '-forceattrs', '-functionattrs', '-globaldce', '-globalopt', '-gvn', '-indvars', '-inferattrs', '-inline', '-instcombine', '-instsimplify', '-ipsccp', '-jump-threading', '-lcssa', '-libcalls-shrinkwrap', '-licm', '-loop-data-prefetch', '-loop-deletion', '-loop-distribute', '-loop-fusion', '-loop-idiom', '-loop-interchange', '-loop-load-elim', '-loop-predication', '-loop-reduce', '-loop-rotate', '-loop-simplify', '-loop-simplifycfg', '-loop-sink', '-loop-unroll', '-loop-unroll-and-jam', '-loop-unswitch', '-loop-vectorize', '-lower-constant-intrinsics', '-lower-expect', '-lowerinvoke', '-mem2reg', '-memcpyopt', '-mergefunc', '-mldst-motion', '-partial-inliner', '-pgo-memop-opt', '-prune-eh', '-reassociate', '-rpo-functionattrs', '-sccp', '-simplifycfg', '-sink', '-slp-vectorizer', '-speculative-execution', '-sroa', '-strip-dead-prototypes', '-tailcallelim']
+
+    # O3_seq = re.split(r'[,()]', string.strip())
+    # O3_seq = [x for x in O3_seq if x!='' and x!='function' and x!='cgscc' and x!='loop' and not x.startswith(('function<','loop<','cgscc<','devirt')) ]
     
-    # passes_Cbench=['-adce', '-argpromotion', '-barrier', '-bdce', '-break-crit-edges', '-called-value-propagation', '-constmerge', '-dse', '-early-cse', '-early-cse-memssa', '-ee-instrument', '-elim-avail-extern', '-functionattrs', '-globalopt', '-gvn', '-indvars', '-inferattrs', '-inline', '-instcombine', '-ipsccp', '-jump-threading', '-licm', '-loop-fusion', '-loop-idiom', '-loop-reduce', '-loop-rotate', '-loop-simplifycfg', '-loop-unroll', '-loop-unswitch', '-loop-vectorize', '-mem2reg', '-reassociate', '-separate-const-offset-from-gep', '-simplifycfg', '-sink', '-slp-vectorizer', '-slsr', '-sroa', '-strip-dead-prototypes', '-tailcallelim']#'-separate-const-offset-from-gep', '-slsr', 
-    # for x in passes_Cbench:
-    #     if x not in passes:
+    cmd ='opt --print-passes > all_passes.txt'
+    subprocess.run(cmd, shell=True)
+    kind2passes = gen_kind2pass('all_passes.txt')
+    # print('='*20)
+    # print('kind2passes', kind2passes)
+
+    pass2kind = {}
+    analysis_passes = []
+    all_tran_passes = []
+    for kind in kind2passes:
+        if 'analyses' in kind:
+            analysis_passes.extend(kind2passes[kind])
+        else:
+            for pass_ in kind2passes[kind]:
+                if pass_.startswith(('print','view','verify')) or 'remark' in pass_ or 'invalidate' in pass_ or 'transform-warning' in pass_ or pass_ == 'recompute-globalsaa':
+                    analysis_passes.append(pass_)
+                else:
+                    all_tran_passes.append(pass_)
+                    if kind.startswith('Module'):
+                        large_kind='module'
+                    elif kind.startswith('CGSCC'):
+                        large_kind='cgscc'
+                    elif kind.startswith('Function'):
+                        large_kind='function'
+                    elif kind.startswith('Loop'):
+                        large_kind='loop'
+                    else:
+                        assert 1==0
+                    pass2kind[pass_] = large_kind
+
+    # print('Number of all transform passes:',len(all_tran_passes))
+
+    # for x in O3_seq:
+    #     if x.split('<')[0] not in all_tran_passes:
     #         print(x)
-    # passes = passes + passes_Cbench
-    passes = sorted(set(passes))
-    return passes,O3_trans_seq
+    # O3_trans_seq=[x for x in O3_seq if x.split('<')[0] not in analysis_passes and x.split('<')[0] in all_tran_passes]# 
+    # # print('O3 seq:',O3_trans_seq)
 
+    O3_trans_seq=[x for x in O3_seq if split_by_parentheses(x)[-1].split('<')[0] in all_tran_passes]# 
 
-def compilergym_space():  
-    passes=['-add-discriminators', '-adce', '-aggressive-instcombine', '-alignment-from-assumptions', '-always-inline', '-argpromotion', '-attributor', '-barrier', '-bdce', '-break-crit-edges', '-simplifycfg', '-callsite-splitting', '-called-value-propagation', '-canonicalize-aliases', '-consthoist', '-constmerge', '-constprop', '-coro-cleanup', '-coro-early', '-coro-elide', '-coro-split', '-correlated-propagation', '-cross-dso-cfi', '-deadargelim', '-dce', '-die', '-dse', '-reg2mem', '-div-rem-pairs', '-early-cse-memssa', '-elim-avail-extern', '-ee-instrument', '-flattencfg', '-float2int', '-forceattrs', '-inline', '-insert-gcov-profiling', '-gvn-hoist', '-gvn', '-globaldce', '-globalopt', '-globalsplit', '-guard-widening', '-hotcoldsplit', '-ipconstprop', '-ipsccp', '-indvars', '-irce', '-infer-address-spaces', '-inferattrs', '-inject-tli-mappings', '-instsimplify', '-instcombine', '-instnamer', '-jump-threading', '-lcssa', '-licm', '-libcalls-shrinkwrap', '-load-store-vectorizer', '-loop-data-prefetch', '-loop-deletion', '-loop-distribute', '-loop-fusion', '-loop-guard-widening', '-loop-idiom', '-loop-instsimplify', '-loop-interchange', '-loop-load-elim', '-loop-predication', '-loop-reroll', '-loop-rotate', '-loop-simplifycfg', '-loop-simplify', '-loop-sink', '-loop-reduce', '-loop-unroll-and-jam', '-loop-unroll', '-loop-unswitch', '-loop-vectorize', '-loop-versioning-licm', '-loop-versioning', '-loweratomic', '-lower-constant-intrinsics', '-lower-expect', '-lower-guard-intrinsic', '-lowerinvoke', '-lower-matrix-intrinsics', '-lowerswitch', '-lower-widenable-condition', '-memcpyopt', '-mergefunc', '-mergeicmps', '-mldst-motion', '-sancov', '-name-anon-globals', '-nary-reassociate', '-newgvn', '-pgo-memop-opt', '-partial-inliner', '-partially-inline-libcalls', '-post-inline-ee-instrument', '-functionattrs', '-mem2reg', '-prune-eh', '-reassociate', '-redundant-dbg-inst-elim', '-rpo-functionattrs', '-rewrite-statepoints-for-gc', '-sccp', '-slp-vectorizer', '-sroa', '-scalarizer', '-separate-const-offset-from-gep', '-simple-loop-unswitch', '-sink', '-speculative-execution', '-slsr', '-strip-dead-prototypes', '-strip-debug-declare', '-strip-nondebug', '-strip', '-tailcallelim', '-mergereturn']
-    return passes
+    # print('Length of O3 seq:',len(O3_trans_seq))
+    O3_passes = sorted(set(O3_trans_seq))
+    # print('Number of O3 transform passes:',len(O3_passes))
+    # print('O3 passes:',O3_passes)
+    O3_passes_clear = [split_by_parentheses(x)[-1].split('<')[0] for x in O3_passes]
+    O3_passes_clear = sorted(set(O3_passes_clear))
+    # print('Number of clear O3 transform passes:',len(O3_passes_clear))
+    # print('O3 passes clear:',O3_passes_clear)
+
+    other_passes_clear = 'break-crit-edges loop-data-prefetch loop-fusion loop-interchange loop-unroll-and-jam lowerinvoke sink ee-instrument'.split() #loop-reduce 
+    # other_passes_clear='loop-fusion'.split()
+    other_passes_clear = [x for x in other_passes_clear if x not in O3_passes_clear]
+    passes_clear = O3_passes_clear + other_passes_clear
+    # print(passes_clear)
+
+    other_passes =[]
+    for pass_ in other_passes_clear:
+        if pass2kind[pass_] == 'module':
+            other_passes.append(pass_)
+        elif pass2kind[pass_] == 'cgscc':
+            other_passes.append(f'cgscc(devirt<4>({pass_})')
+        elif pass2kind[pass_] == 'function':
+            other_passes.append(f'function<eager-inv>({pass_})')
+        elif pass2kind[pass_] == 'loop':
+            other_passes.append(f'function<eager-inv>(loop({pass_}))')
+    # print(other_passes)
+    # other_passes =[]
+    passes=sorted(list(set(O3_passes + other_passes)))
+    print('Number of used passes:',len(passes))
+
+    
+
+    return passes, passes_clear, pass2kind, O3_trans_seq
+    
 
 if __name__ == "__main__":
-    print(default_space())
-    print(len(default_space()))
-    # print(globalvar.get_value('compilergym_pass
+    passes, passes_clear, pass2kind, O3_trans_seq = default_space()
+    # print(len(passes))
+    # print(passes)
+    # print(pass2kind)
     
-# compilergym_unuseful_passes = '-add-discriminators'
-# compilergym_passes = '-add-discriminators'
 
-
-
-
-# with open('llvm10_all_passes.txt', 'r',encoding="utf-8") as f:
-#     string=f.read()
-#     all_passes=string.split('\n')
-#     all_passes=[x for x in all_passes if x !='' and x[0] == '-']
-
-
-
-# O3_trans_seq=[x for x in O3_seq if x not in analysis_passes]
-# print(len(O3_seq),len(O3_trans_seq), len(set(O3_trans_seq)))
-# with open('O3_trans_seq.txt', 'w') as f:
-#     f.write(' '.join(O3_trans_seq))
-# O3_trans_passes=list(set(O3_trans_seq))
-# with open('O3_trans_passes.txt', 'w') as f:
-#     f.write(' '.join(O3_trans_passes))
-# with open('O3_trans_seq.txt', 'r') as f:
-#     tmp = f.read()
-#     O3_seq = tmp.split()
-# print(O3_seq)
-# with open('O3_trans_passes.txt', 'r') as f:
-#     tmp = f.read()
-#     O3_passes = tmp.split()
-# print(O3_passes)
-
-
-# print(set(O3_trans_seq))
-# # tt='-sroa -globalopt -jump-threading -loop-unswitch -instcombine -loop-unroll'.split()
-# # for x in O3_trans_seq:
-# #     if x == tt[0]:
-# #         tt.pop(0)
-# #         print(tt)
-# #         if tt == []:
-# #             break
-
-        
-# # y=["-sroa", "-globalopt","-jump-threading","-loop-unswitch",
-# #             "-ipsccp",
-# #             "-instcombine",
-# #             "-loop-unroll",
-# #             "-attributor","-reassociate",
-# #             "-instcombine",
-# #             "-strip",
-# #             "-mem2reg","-globalopt",
-# #             "-mem2reg",
-# #             "-reassociate",
-# #             "-tailcallelim","-instcombine",
-# #             "-sroa",
-# #             "-jump-threading",
-# #             "-loop-idiom",
-# #             "-loop-deletion",
-# #             "-sroa",
-# #             "-tailcallelim"]
-
-# # for x in y:
-# #     if x not in O3_seq:
-# #         print(x)
-
-# # kkk='-loop-reroll -loop-unroll -unroll-allow-partial'
-
-# #llvm10='-ee-instrument -simplifycfg -sroa -early-cse -lower-expect -forceattrs -inferattrs -callsite-splitting -ipsccp -called-value-propagation -attributor -globalopt -mem2reg -deadargelim -basicaa -instcombine -simplifycfg -prune-eh -inline -functionattrs -argpromotion -sroa -basicaa -early-cse-memssa -speculative-execution -jump-threading -correlated-propagation -simplifycfg -aggressive-instcombine -basicaa -instcombine -libcalls-shrinkwrap -pgo-memop-opt -basicaa -tailcallelim -simplifycfg -reassociate -loop-simplify -lcssa -basicaa -loop-rotate -licm -loop-unswitch -simplifycfg -basicaa -instcombine -loop-simplify -lcssa -indvars -loop-idiom -loop-deletion -loop-unroll -mldst-motion -gvn -basicaa -memcpyopt -sccp -bdce -instcombine -jump-threading -correlated-propagation -basicaa -dse -loop-simplify -lcssa -licm -adce -simplifycfg -basicaa -instcombine -barrier -elim-avail-extern -rpo-functionattrs -globalopt -globaldce -float2int -lower-constant-intrinsics -loop-simplify -lcssa -basicaa -loop-rotate -loop-distribute -basicaa -loop-vectorize -loop-simplify -loop-load-elim -basicaa -instcombine -simplifycfg -basicaa -slp-vectorizer -instcombine -loop-simplify -lcssa -loop-unroll -instcombine -loop-simplify -lcssa -licm -alignment-from-assumptions -strip-dead-prototypes -globaldce -constmerge -loop-simplify -lcssa -basicaa -loop-sink -instsimplify -div-rem-pairs -simplifycfg'.split()
-# #
-# #llvm12='-ee-instrument -simplifycfg -sroa -early-cse -lower-expect -annotation2metadata -forceattrs -inferattrs -callsite-splitting -ipsccp -called-value-propagation -globalopt -mem2reg -deadargelim -instcombine -simplifycfg -prune-eh -inline -openmpopt -function-attrs -argpromotion -sroa -early-cse-memssa -speculative-execution -jump-threading -correlated-propagation -simplifycfg -aggressive-instcombine -instcombine -libcalls-shrinkwrap -pgo-memop-opt -tailcallelim -simplifycfg -reassociate -loop-simplify -lcssa -loop-rotate -licm -loop-unswitch -simplifycfg -instcombine -loop-simplify -lcssa -loop-idiom -indvars -loop-deletion -loop-unroll -sroa -mldst-motion -gvn -memcpyopt -sccp -bdce -instcombine -jump-threading -correlated-propagation -adce -dse -loop-simplify -lcssa -licm -simplifycfg -instcombine -barrier -elim-avail-extern -rpo-function-attrs -globalopt -globaldce -float2int -lower-constant-intrinsics -loop-simplify -lcssa -loop-rotate -loop-distribute -inject-tli-mappings -loop-vectorize -loop-simplify -loop-load-elim -instcombine -simplifycfg -inject-tli-mappings -slp-vectorizer -vector-combine -instcombine -loop-simplify -lcssa -loop-unroll -instcombine -loop-simplify -lcssa -licm -alignment-from-assumptions -strip-dead-prototypes -globaldce -constmerge -cg-profile -loop-simplify -lcssa -loop-sink -instsimplify -div-rem-pairs -simplifycfg -annotation-remarks'.split()
-# #print('\n')
-# #diff=set(llvm10)^set(llvm12)
-# #print(set(llvm10))
-
-# llvm12_O3_passes=['-lower-expect', '-aggressive-instcombine', '-forceattrs', '-loop-unswitch', '-prune-eh', '-strip-dead-prototypes', '-argpromotion', '-ipsccp', '-div-rem-pairs', '-openmpopt', '-called-value-propagation', '-pgo-memop-opt', '-constmerge', '-libcalls-shrinkwrap', '-speculative-execution', '-loop-simplify', '-mldst-motion', '-adce', '-callsite-splitting', '-indvars', '-loop-unroll', '-dse', '-bdce', '-vector-combine', '-globaldce', '-inject-tli-mappings', '-lcssa', '-gvn', '-slp-vectorizer', '-loop-vectorize', '-lower-constant-intrinsics', '-sroa', '-early-cse-memssa', '-loop-deletion', '-deadargelim', '-licm', '-globalopt', '-mem2reg', '-jump-threading', '-correlated-propagation', '-simplifycfg', '-float2int', '-cg-profile', '-ee-instrument', '-barrier', '-function-attrs', '-reassociate', '-instcombine', '-alignment-from-assumptions', '-loop-idiom', '-early-cse', '-tailcallelim', '-loop-rotate', '-annotation-remarks', '-memcpyopt', '-loop-distribute', '-sccp', '-loop-sink', '-annotation2metadata', '-inline', '-inferattrs', '-loop-load-elim', '-instsimplify', '-rpo-function-attrs', '-elim-avail-extern']
-# llvm10_O3_passes=['-prune-eh', '-barrier', '-early-cse', '-globalopt', '-loop-rotate', '-simplifycfg', '-correlated-propagation', '-deadargelim', '-loop-simplify', '-loop-unswitch', '-loop-load-elim', '-alignment-from-assumptions', '-bdce', '-elim-avail-extern', '-constmerge', '-callsite-splitting', '-functionattrs', '-licm', '-loop-sink', '-called-value-propagation', '-memcpyopt', '-float2int', '-dse', '-div-rem-pairs', '-lcssa', '-adce', '-loop-deletion', '-gvn', '-indvars', '-sroa', '-lower-constant-intrinsics', '-reassociate', '-libcalls-shrinkwrap', '-loop-distribute', '-jump-threading', '-loop-idiom', '-loop-unroll', '-aggressive-instcombine', '-mem2reg', '-loop-vectorize', '-speculative-execution', '-pgo-memop-opt', '-instcombine', '-rpo-functionattrs', '-ee-instrument', '-instsimplify', '-inferattrs', '-inline', '-tailcallelim', '-globaldce', '-slp-vectorizer', '-sccp', '-mldst-motion', '-ipsccp', '-argpromotion', '-lower-expect', '-strip-dead-prototypes', '-attributor', '-early-cse-memssa', '-forceattrs']
-
-# x=[x for x in llvm10_O3_passes if x not in llvm12_O3_passes]
-# print(x)
