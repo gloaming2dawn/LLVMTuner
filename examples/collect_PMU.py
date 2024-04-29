@@ -39,6 +39,7 @@ from llvmtuner.show_features import read_json_lines
 parser = argparse.ArgumentParser()
 parser.add_argument('--device', required=True, help='')
 parser.add_argument('--method', default='pmu', help='')
+parser.add_argument('--optlevel', default='O3', help='')
 parser.add_argument('--benchmark', required=True, help='')
 parser.add_argument('--budget', type=int,default=50, help='')
 parser.add_argument('--n-parallel', type=int,default=50, help='')
@@ -51,7 +52,7 @@ passes, passes_clear, pass2kind, O3_trans_seq=default_space()
 
 
 # network_dijkstra噪声太大，network_patricia噪声在3%
-ben2cmd = {'automotive_bitcount': './__run 1 5', 'automotive_qsort1': './__run 1 10' ,'automotive_susan_c':'./__run 9 5', 'automotive_susan_e':'./__run 9 2', 'automotive_susan_s':'./__run 19 1','bzip2d':'./__run 12 1','bzip2e':'./__run 12 1','consumer_jpeg_c':'./__run 15 2','consumer_lame':'./__run 6 1', 'consumer_tiffmedian':'./__run 11 1','network_dijkstra':'./__run 10 1','network_patricia':'./__run 13 20','security_blowfish_d':'./__run 20 20', 'security_blowfish_e':'./__run 20 20', 'security_sha':'./__run 4 10', 'telecom_adpcm_c':'./__run 2 3','telecom_adpcm_d':'./__run 2 5', 'telecom_CRC32':50, 'telecom_gsm':'./__run 6 1', 'consumer_jpeg_d':'./__run 3 1', 'consumer_tiff2bw':'./__run 3 1', 'consumer_tiff2rgba':'./__run 3 1', 'office_stringsearch1': './__run 4 50', 'consumer_tiffdither': './__run 3 1', 'security_rijndael_d':'./__run 4 1', 'security_rijndael_e':'./__run 4 1'}
+ben2cmd = {'automotive_bitcount': './__run 1 5', 'automotive_qsort1': './__run 1 10' ,'automotive_susan_c':'./__run 9 5', 'automotive_susan_e':'./__run 9 2', 'automotive_susan_s':'./__run 19 1','bzip2d':'./__run 12 1','bzip2e':'./__run 12 1','consumer_jpeg_c':'./__run 15 2','consumer_lame':'./__run 6 1', 'consumer_tiffmedian':'./__run 11 1','network_dijkstra':'./__run 10 1','network_patricia':'./__run 13 20','security_blowfish_d':'./__run 20 20', 'security_blowfish_e':'./__run 20 20', 'security_sha':'./__run 4 10', 'telecom_adpcm_c':'./__run 2 3','telecom_adpcm_d':'./__run 2 5', 'telecom_CRC32':'./__run 2 1', 'telecom_gsm':'./__run 6 1', 'consumer_jpeg_d':'./__run 3 1', 'consumer_tiff2bw':'./__run 3 1', 'consumer_tiff2rgba':'./__run 3 1', 'office_stringsearch1': './__run 4 50', 'consumer_tiffdither': './__run 3 1', 'security_rijndael_d':'./__run 4 1', 'security_rijndael_e':'./__run 4 1'}
 
 
 ben2hot={'automotive_bitcount': ['bitcnts', 'bitcnt_4', 'bitcnt_3', 'bitcnt_2'], 'automotive_qsort1': ['qsort', 'qsort_large'], 'automotive_susan_c': ['susan'], 'automotive_susan_e': ['susan'], 'automotive_susan_s': ['susan'], 'bzip2d': ['bzlib', 'decompress'], 'bzip2e': ['blocksort', 'compress', 'bzlib'], 'consumer_jpeg_c': ['jcphuff', 'jcdctmgr', 'jfdctint', 'jccolor', 'jchuff', 'jccoefct'], 'consumer_jpeg_d': ['jidctint', 'jdhuff', 'jdcolor', 'jdsample'], 'consumer_lame': ['psymodel', 'newmdct', 'fft', 'quantize', 'takehiro','quantize-pvt', 'l3bitstream', 'formatBitstream'], 'consumer_tiff2bw': ['tif_lzw', 'tif_predict', 'tiff2bw'], 'consumer_tiff2rgba': ['tif_lzw', 'tif_getimage', 'tif_predict'], 'consumer_tiffmedian': ['tiffmedian'], 'network_dijkstra': ['dijkstra_large'], 'network_patricia': ['patricia'], 'office_stringsearch1': ['pbmsrch_large'], 'security_blowfish_d': ['bf_enc', 'bf_cfb64'], 'security_blowfish_e': ['bf_enc', 'bf_cfb64'], 'security_sha': ['sha'], 'telecom_CRC32': ['crc_32'], 'telecom_adpcm_c': ['adpcm'], 'telecom_adpcm_d': ['adpcm'], 'telecom_gsm': ['long_term', 'short_term', 'preprocess', 'rpe', 'lpc'], 'consumer_tiffdither':['tif_fax3','tiffdither','tif_lzw'], 'security_rijndael_d':['aes'], 'security_rijndael_e':['aes']}
@@ -154,8 +155,8 @@ def collect_pmu():
                 sshC.run(f'rm output_large.dec' , hide=True, timeout=timeout_seconds)
             if args.benchmark == 'security_rijndael_e':
                 sshC.run(f'rm output_large.enc' , hide=True, timeout=timeout_seconds)
-                
-        
+    
+    
     except invoke.exceptions.UnexpectedExit:
         assert 1==0
     except invoke.exceptions.CommandTimedOut:
@@ -179,18 +180,13 @@ fun_O3.repeat = 10
 fun_O3.adaptive_measure = False
 t0=time.time()
 print('-----------------build -O3-----------------')
-fun_O3.build('default<O3>')
+fun_O3.build(f'default<O3>')
 print('O3 compilation time:',time.time()-t0)
-# fun_O3('default<O3>')
-
-
 
 hotfiles=ben2hot[args.benchmark]
-
-fun = Function_wrap(ccmd, ben_dir, tmp_dir, run_and_eval_fun, hotfiles)#, profdata=os.path.join(ben_dir, 'default.profdata')
-# fun.repeat = 1
-# fun.adaptive_measure = False
-len_seq=150
+hotfiles = hotfiles[:1]
+fun = Function_wrap(ccmd, ben_dir, tmp_dir, collect_pmu, hotfiles)
+fun.build(f'default<{args.optlevel}>')
 
 
 

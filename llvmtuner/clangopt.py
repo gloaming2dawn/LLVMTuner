@@ -40,7 +40,6 @@ args, unknown = parser.parse_known_args()
 
 
 
-
 class Clangopt:
     def __init__(self):
         '''
@@ -65,7 +64,7 @@ class Clangopt:
         # maybe we could also use clang -###
         clang_cmd=['clang']+unknown
         self.clang_cmd = clang_cmd
-        print(self.clang_cmd)
+        print(' '.join(self.clang_cmd))
         
         optlevels=['-O3','-O2','-O1','-O0','-Oz','-O4','-Ofast','-Og','-Os']
         cmd=[x for x in clang_cmd if x not in optlevels ]
@@ -186,8 +185,8 @@ class Clangopt:
                 else:
                     link_cmd = ' '.join(self.clang_cmd)
                 print(link_cmd)
-                ret = subprocess.run(link_cmd, shell=True, capture_output=True)
-                assert ret.returncode == 0, link_cmd
+                ret = subprocess.run(link_cmd, cwd =os.getcwd(), shell=True, capture_output=True)
+                assert ret.returncode == 0, [os.getcwd(), link_cmd]
                 # if '-o' in self.clang_cmd:
                 #     j = self.clang_cmd.index('-o')
                 #     output = self.clang_cmd[j+1]
@@ -310,8 +309,9 @@ class Clangopt:
         #     return flag
         
         # cmd = os.path.join(llvm_dir,'llc')+'  -O3 {} -o {} --print-machine-bfi 2> {}'.format(IR_opt, asm, machinebfi)
-        cmd = os.path.join(llvm_dir,'llc')+' -O3 -filetype=obj {} -o {}'.format(IR_opt, obj)
+        cmd = os.path.join(llvm_dir,'llc')+' -O3 -filetype=obj -relocation-model=pic {} -o {}'.format(IR_opt, obj)
         flag, ret = cls.runcmd(cmd, cwd)
+        print(cmd,cwd)
         assert flag == True, cmd
         
         if obj_cp != None:

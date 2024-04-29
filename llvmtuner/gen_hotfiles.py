@@ -18,15 +18,20 @@ def get_func_names(IR_path):
 
 def perf_record(sshC, local_dir, run_dir, run_cmd):
     try:
-        cmd = f"bash -c 'cd {run_dir} && perf record -F 999 -a -g -- {run_cmd}'"
-        sshC.sudo(cmd, timeout=100, pty=True)
+        cmd = f"bash -c 'cd {run_dir} && perf record -F 4999 -a -g -- {run_cmd}'"
+        sshC.sudo(cmd, timeout=200, pty=True)
         cmd = f"bash -c 'cd {run_dir} && perf script > out.perf'"
-        sshC.sudo(cmd, timeout=100, pty=True)
+        sshC.sudo(cmd, timeout=200, pty=True)
         with sshC.cd(run_dir):
             # cmd = f"sudo perf script > out.perf"
             # sshC.run(cmd, timeout=100)
             cmd = f"~/FlameGraph/stackcollapse-perf.pl out.perf > out.folded"
-            sshC.run(cmd, timeout=100)
+            sshC.run(cmd, timeout=200)
+        with sshC.cd(run_dir):
+            # cmd = f"sudo perf script > out.perf"
+            # sshC.run(cmd, timeout=100)
+            cmd = f"~/FlameGraph/flamegraph.pl out.folded > kernel.svg"
+            sshC.run(cmd, timeout=200)
     except Exception as e:
         assert 1==0
 

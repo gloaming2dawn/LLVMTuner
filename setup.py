@@ -9,6 +9,6 @@ setup(
     install_requires=['numpy'],
     zip_safe=False,
     entry_points = {
-        'console_scripts': ['clangopt=llvmtuner.clangopt:main'],
+        'console_scripts': ['clangopt=llvmtuner.clangopt:main','clangxxopt=llvmtuner.clangxxopt:main'],
     }
 )

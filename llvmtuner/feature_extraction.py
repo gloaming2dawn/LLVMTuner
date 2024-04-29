@@ -18,7 +18,7 @@ from sklearn.preprocessing import MinMaxScaler
 possible_rbun=['early-cse.NumSimplify', 'gvn.NumGVNEqProp', 'gvn.NumGVNInstr', 'gvn.NumGVNLoad', 'gvn.NumGVNPRE', 'gvn.NumGVNSimpl', 'gvn.NumPRELoad', 'licm.NumPromoted', 'licm.NumSunk', 'loop-fusion.InvalidExitBlock', 'loop-fusion.InvalidExitingBlock', 'loop-fusion.MayThrowException', 'loop-fusion.UnknownTripCount', 'loop-unswitch.TotalInsts', 'reassociate.NumChanged', 'sccp.IPNumInstRemoved', 'sccp.NumDeadBlocks', 'sccp.NumInstRemoved', 'sink.NumSinkIter', 'sroa.NumAllocaPartitionUses', 'sroa.NumAllocaPartitions', 'sroa.NumDeleted']
 
 
-#通过gen_llvm_transform_stats_key.py自动获取的pass_stats_keys，当前仅在LLVM10测试
+#通过gen_llvm_transform_stats_key.py自动获取的pass_stats_keys，当前仅在LLVM17测试
 features = {'dse':'NumRedundantStores NumFastStores NumFastOther NumCompletePartials NumModifiedStores',
             
             'licm':'NumCreatedBlocks NumClonedBranches NumSunk NumHoisted NumMovedLoads NumMovedCalls NumLoadPromoted NumLoadStorePromoted NumMinMaxHoisted NumGEPsHoisted NumAddSubHoisted',

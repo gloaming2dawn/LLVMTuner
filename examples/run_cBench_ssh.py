@@ -4,6 +4,7 @@ Created on Wed Mar  2 17:54:48 2022
 
 @author: scjzhadmin
 """
+# gsm O0 pmu出错
 import time
 import hashlib
 import random as random
@@ -36,6 +37,7 @@ from llvmtuner.show_features import read_json_lines
 # python run_cBench_ssh.py --device=6 --method=BO --benchmark=telecom_gsm --budget=1000 --device=cuda
 # python run_cBench_ssh.py --device=4 --method=adaptive_local --benchmark=consumer_lame --budget=3000
 # python run_cBench_ssh.py --device=6 --method=test_best --benchmark=security_sha
+# python run_cBench_ssh.py --device=6 --method=cost_model --budget=2000 --benchmark=security_sha
 
 
 parser = argparse.ArgumentParser()
@@ -57,7 +59,7 @@ passes, passes_clear, pass2kind, O3_trans_seq=default_space()
 # ben2num={'automotive_bitcount':5, 'automotive_qsort1': 10,'automotive_susan_c':50, 'automotive_susan_e':20, 'automotive_susan_s':5,'bzip2d':3,'bzip2e':2,'consumer_jpeg_c':100,'consumer_lame':10, 'consumer_tiffmedian':200,'network_dijkstra':100000,'network_patricia':5000,'security_blowfish_d':5000, 'security_blowfish_e':5000, 'security_sha':8000, 'telecom_adpcm_c':500,'telecom_adpcm_d':1000, 'telecom_CRC32':50, 'telecom_gsm':40, 'consumer_jpeg_d':100, 'consumer_tiff2bw':100, 'consumer_tiff2rgba':60, 'office_stringsearch1': 100000, 'consumer_tiffdither': 150, 'security_rijndael_d':1000, 'security_rijndael_e':1000} 
 
 # network_dijkstra噪声太大，network_patricia噪声在3%
-ben2cmd = {'automotive_bitcount': './__run 1 5', 'automotive_qsort1': './__run 1 10' ,'automotive_susan_c':'./__run 9 5', 'automotive_susan_e':'./__run 9 2', 'automotive_susan_s':'./__run 19 1','bzip2d':'./__run 12 1','bzip2e':'./__run 12 1','consumer_jpeg_c':'./__run 15 2','consumer_lame':'./__run 6 1', 'consumer_tiffmedian':'./__run 11 1','network_dijkstra':'./__run 10 1','network_patricia':'./__run 13 20','security_blowfish_d':'./__run 20 20', 'security_blowfish_e':'./__run 20 20', 'security_sha':'./__run 4 10', 'telecom_adpcm_c':'./__run 2 3','telecom_adpcm_d':'./__run 2 5', 'telecom_CRC32':50, 'telecom_gsm':'./__run 6 1', 'consumer_jpeg_d':'./__run 3 1', 'consumer_tiff2bw':'./__run 3 1', 'consumer_tiff2rgba':'./__run 3 1', 'office_stringsearch1': './__run 4 50', 'consumer_tiffdither': './__run 3 1', 'security_rijndael_d':'./__run 4 1', 'security_rijndael_e':'./__run 4 1'}
+ben2cmd = {'automotive_bitcount': './__run 1 5', 'automotive_qsort1': './__run 1 10' ,'automotive_susan_c':'./__run 9 5', 'automotive_susan_e':'./__run 9 2', 'automotive_susan_s':'./__run 19 1','bzip2d':'./__run 12 1','bzip2e':'./__run 12 1','consumer_jpeg_c':'./__run 15 2','consumer_lame':'./__run 6 1', 'consumer_tiffmedian':'./__run 11 1','network_dijkstra':'./__run 10 1','network_patricia':'./__run 13 20','security_blowfish_d':'./__run 20 20', 'security_blowfish_e':'./__run 20 20', 'security_sha':'./__run 4 10', 'telecom_adpcm_c':'./__run 2 3','telecom_adpcm_d':'./__run 2 5', 'telecom_CRC32':'./__run 2 1', 'telecom_gsm':'./__run 6 1', 'consumer_jpeg_d':'./__run 3 1', 'consumer_tiff2bw':'./__run 3 1', 'consumer_tiff2rgba':'./__run 3 1', 'office_stringsearch1': './__run 4 50', 'consumer_tiffdither': './__run 3 1', 'security_rijndael_d':'./__run 4 1', 'security_rijndael_e':'./__run 4 1'}
 
 
 ben2hot={'automotive_bitcount': ['bitcnts', 'bitcnt_4', 'bitcnt_3', 'bitcnt_2'], 'automotive_qsort1': ['qsort', 'qsort_large'], 'automotive_susan_c': ['susan'], 'automotive_susan_e': ['susan'], 'automotive_susan_s': ['susan'], 'bzip2d': ['bzlib', 'decompress'], 'bzip2e': ['blocksort', 'compress', 'bzlib'], 'consumer_jpeg_c': ['jcphuff', 'jcdctmgr', 'jfdctint', 'jccolor', 'jchuff', 'jccoefct'], 'consumer_jpeg_d': ['jidctint', 'jdhuff', 'jdcolor', 'jdsample'], 'consumer_lame': ['psymodel', 'newmdct', 'fft', 'quantize', 'takehiro','quantize-pvt', 'l3bitstream', 'formatBitstream'], 'consumer_tiff2bw': ['tif_lzw', 'tif_predict', 'tiff2bw'], 'consumer_tiff2rgba': ['tif_lzw', 'tif_getimage', 'tif_predict'], 'consumer_tiffmedian': ['tiffmedian'], 'network_dijkstra': ['dijkstra_large'], 'network_patricia': ['patricia'], 'office_stringsearch1': ['pbmsrch_large'], 'security_blowfish_d': ['bf_enc', 'bf_cfb64'], 'security_blowfish_e': ['bf_enc', 'bf_cfb64'], 'security_sha': ['sha'], 'telecom_CRC32': ['crc_32'], 'telecom_adpcm_c': ['adpcm'], 'telecom_adpcm_d': ['adpcm'], 'telecom_gsm': ['long_term', 'short_term', 'preprocess', 'rpe', 'lpc'], 'consumer_tiffdither':['tif_fax3','tiffdither','tif_lzw'], 'security_rijndael_d':['aes'], 'security_rijndael_e':['aes']}
@@ -85,7 +87,7 @@ host="nvidia@TX2-{}.local".format(args.device)
 sshC=Connection(host=host)
 
 run_dir = '/home/nvidia/cBench_V1.1/{}/src_work/'.format(args.benchmark)
-run_cmd = './__run 1 {}'.format(ben2num[args.benchmark])
+# run_cmd = './__run 1 {}'.format(ben2num[args.benchmark])
 # run_cmd = './__run 3 1' 
 # run_cmd = './__run 15 5' 
 # run_cmd = './__run 3 1'
@@ -129,10 +131,9 @@ def run_and_eval_fun():
         runtime = inf
     except invoke.exceptions.CommandTimedOut:
         runtime = inf
-        # kill_command = f"kill {remote_process_pid}"
-        # sshC.run(kill_command)
 
     return runtime 
+
 
 def collect_pmu():
     try:
@@ -152,7 +153,7 @@ def collect_pmu():
         timeout_seconds = 20
         with sshC.cd(run_dir):
             perf_cmd = 'perf stat -e branch-misses,cache-misses,cache-references,cpu-cycles,instructions,cpu-clock,L1-dcache-load-misses,L1-dcache-loads,L1-dcache-store-misses,L1-dcache-stores,branch-load-misses,branch-loads'
-            ret=sshC.run(f'timeout {timeout_seconds} {perf_cmd} {run_cmd}' , hide=False, timeout=timeout_seconds) 
+            ret=sshC.run(f'timeout {timeout_seconds} {perf_cmd} {run_cmd}' , hide=True, timeout=timeout_seconds) 
             # some benchmarks have bug, we need to clear the output, otherwise the next run will cost much more time
             if args.benchmark == 'consumer_tiff2rgba':
                 sshC.run(f'rm output_largergba.tif' , hide=True, timeout=timeout_seconds)
@@ -164,12 +165,32 @@ def collect_pmu():
                 sshC.run(f'rm output_large.dec' , hide=True, timeout=timeout_seconds)
             if args.benchmark == 'security_rijndael_e':
                 sshC.run(f'rm output_large.enc' , hide=True, timeout=timeout_seconds)
-                
-        
+
+        temp=ret.stderr.strip()
+        real=temp.split('\n')[-3]
+        searchObj = re.search( r'real\s*(.*)m(.*)s.*', temp)
+        runtime = int(searchObj[1])*60+float(searchObj[2])
+
+
+
     except invoke.exceptions.UnexpectedExit:
-        assert 1==0
+        runtime = inf
     except invoke.exceptions.CommandTimedOut:
-        assert 1==0
+        runtime = inf   
+
+    lines = temp.strip().split('\n')
+    features = {}
+    for line in lines:
+        match = re.search(r'(\d+(?:,\d+)*)\s+(\w+(?:-\w+)*)', line)
+        if match:
+            value = match.group(1).replace(',', '')
+            key = match.group(2)
+            features[key] = int(value)
+    
+    pmu_events = 'branch-misses,cache-misses,cache-references,cpu-cycles,instructions,cpu-clock,L1-dcache-load-misses,L1-dcache-loads,L1-dcache-store-misses,L1-dcache-stores,branch-load-misses,branch-loads'.split(',')
+    pmu = {k: features[k] for k in pmu_events}     
+    
+    return pmu
 
 
 allfiles=[]
@@ -194,7 +215,6 @@ print('O3 compilation time:',time.time()-t0)
 
 
 hotfiles=ben2hot[args.benchmark]
-
 fun = Function_wrap(ccmd, ben_dir, tmp_dir, run_and_eval_fun, hotfiles)#, profdata=os.path.join(ben_dir, 'default.profdata')
 # fun.repeat = 1
 # fun.adaptive_measure = False
@@ -225,7 +245,7 @@ if __name__ == "__main__":
 
     if args.method == 'O3':
         # f.hotfiles = allfiles
-        fun.repeat = 5
+        fun.repeat = 10
         fun.adaptive_measure = False
         y = fun('default<O3>')
     
@@ -246,6 +266,61 @@ if __name__ == "__main__":
         print(hotfiles, hotfiles_details)
         with open(f'{args.benchmark}_hotfiles.json','w') as file:
             json.dump(hotfiles_details, file, indent=4)
+    
+    if args.method == 'cost_model':
+        pmu_savepath = os.path.join(tmp_dir, 'pmu_O3.txt')
+        pmu_cmd = f'python collect_PMU.py --device={args.device} --benchmark={args.benchmark} --optlevel=O3 2> {pmu_savepath}'
+        subprocess.run(pmu_cmd, shell=True)
+
+        pmu_savepath = os.path.join(tmp_dir, 'pmu_O0.txt')
+        pmu_cmd = f'python collect_PMU.py --device={args.device} --benchmark={args.benchmark} --optlevel=O0 2> {pmu_savepath}'
+        subprocess.run(pmu_cmd, shell=True)
+
+        # hotfiles=ben2hot[args.benchmark]
+        # hotfiles = hotfiles[:1]
+        # fun = Function_wrap(ccmd, ben_dir, tmp_dir, run_and_eval_fun, hotfiles)
+        # len_seq=120
+
+
+        # params={}
+        # filename = fun.hotfiles[0]
+        # fileroot,fileext=os.path.splitext(filename)
+        # for ii in range(args.budget):
+        #     seq=random.choices(passes, k=len_seq)
+        #     params[fileroot]=passlist2str(deepcopy(seq))
+        #     y = fun(deepcopy(params))
+
+
+    if args.method == 'collect_pmu':
+        hotfiles=ben2hot[args.benchmark]
+        hotfiles = hotfiles[:1]
+        fun = Function_wrap(ccmd, ben_dir, tmp_dir, run_and_eval_fun, hotfiles)
+        data_path = f'/home/jiayu/result_llvmtuner_17/cBench/{args.benchmark}'
+        with open(f'{data_path}/cost_model/result.json','r') as file:
+            ic = 0
+            for line in file:
+                # 将每行的内容从JSON字符串转换为列表
+                cfgpath, time = json.loads(line)
+                with open(cfgpath, 'r') as file:
+                    cfg=json.load(file)
+                fun.build(cfg['params'])
+                pmu = collect_pmu()
+                cfg['pmu'] = pmu
+                with open(cfgpath, 'w') as file:
+                    json.dump(cfg, file, indent=4)
+                ic = ic+1
+                print(ic, cfgpath)
+                
+
+                
+
+
+        
+
+
+
+
+
 
     
     # if args.method == 'O3-random':

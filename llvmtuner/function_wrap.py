@@ -227,7 +227,6 @@ class Function_wrap:
             params0, y_ref = reduce_pass_single(params0, fileroot)
         return params0, y_ref
     
-    
     def measure(self):
         y_list=[]
         y=self.run_and_eval()
@@ -257,6 +256,11 @@ class Function_wrap:
                 print(y_list)
                 return(y_mean)
     
+    def run_and_getinfo(self):
+        flag = self.build(params)
+        assert flag
+        
+
     def __call__(self, params):
         t0 = time.time()
         if params in self.params_list:
@@ -308,7 +312,7 @@ class Function_wrap:
                     with open(self.result_file, 'a') as f:
                         f.write(json.dumps(data)+'\n')
                     
-                    if len(self.y) % 20 ==0:
+                    if len(self.y) % 50 ==0:
                         plot_file=os.path.join(self.tmp_dir, 'plot{}.json'.format(self.n_evals))
                         with open(plot_file, 'a') as f:
                             f.write(json.dumps(self.y)+'\n')

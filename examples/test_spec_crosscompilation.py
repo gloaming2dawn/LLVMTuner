@@ -69,20 +69,28 @@ def find_latest_folder(directory):
 
 other = ['502.gcc_r','525.x264_r','531.deepsjeng_r','557.xz_r']
 test=['505.mcf_r','520.omnetpp_r', '541.leela_r','544.nab_r']
-train=['510.parest_r','511.povray_r']
-
+train=['510.parest_r','511.povray_r','519.lbm_r']
 different = ['523.xalancbmk_r','526.blender_r']
 analyze = ['538.imagick_r','508.namd_r','500.perlbench_r']
+
 # benchmarks = ['505.mcf_r', '520.omnetpp_r', '523.xalancbmk_r', '525.x264_r', '531.deepsjeng_r', '541.leela_r', '557.xz_r', '508.namd_r', '510.parest_r', '511.povray_r', '519.lbm_r', '538.imagick_r', '544.nab_r']
 
 # some binaries of 525.x264_r require x86 compilation
-benchmarks = ['505.mcf_r', '520.omnetpp_r', '523.xalancbmk_r', '531.deepsjeng_r', '541.leela_r', '557.xz_r', '508.namd_r', '510.parest_r', '511.povray_r', '519.lbm_r', '538.imagick_r', '544.nab_r']
+# benchmarks = ['505.mcf_r', '520.omnetpp_r', '523.xalancbmk_r', '531.deepsjeng_r', '541.leela_r', '557.xz_r', '508.namd_r', '510.parest_r', '511.povray_r', '519.lbm_r', '538.imagick_r', '544.nab_r']
+
+benchmarks = ['500.perlbench_r', '502.gcc_r', '505.mcf_r', '508.namd_r', '510.parest_r', '511.povray_r', '519.lbm_r', '520.omnetpp_r', '523.xalancbmk_r', '525.x264_r', '526.blender_r', '531.deepsjeng_r', '538.imagick_r', '541.leela_r', '544.nab_r', '557.xz_r']
 # benchmarks = ['505.mcf_r', '520.omnetpp_r', '523.xalancbmk_r']
-benchmarks = ['538.imagick_r']
+# benchmarks = ['538.imagick_r']
 for benchmark in benchmarks:
     print(benchmark)
-    workload = 'test' if benchmark in ['505.mcf_r'] else 'train'
-    cmd = f'runcpu --action runsetup --loose --size {workload} --config my-clang-linux-cross_x862aarch64.cfg {benchmark}'
+    if benchmark in test:
+        workload = 'test'
+    elif benchmark in train:
+        workload = 'train'
+    else:
+        continue
+    # cmd = f'runcpu --action runsetup --loose --size {workload} --config my-clang-linux-cross_x862aarch64.cfg {benchmark}'
+    cmd = f'runcpu --action runsetup --loose --size {workload} --config my-clang-linux-x86.cfg {benchmark}'
     stdout, stderr, elapsed_time = run_command_with_timing(cmd)
     assert elapsed_time!=0, benchmark
     
@@ -100,46 +108,59 @@ for benchmark in benchmarks:
     stdout, stderr, elapsed_time = run_command_with_timing(cmd, f'/home/jiayu/cpu2017/benchspec/CPU/{benchmark}/run')
     assert elapsed_time!=0
     
-    for device in [1,2,3,4,5,6]:
-        host="nvidia@TX2-{}.local".format(device)
-        sshC=Connection(host=host)
-        remote_dir = f'/home/nvidia/spec2017_run/{benchmark}'
-        sshC.run(f'rm -rf {remote_dir}')
-        sshC.run(f'mkdir -p {remote_dir}')
-        result = sshC.put(local=os.path.join(f'/home/jiayu/cpu2017/benchspec/CPU/{benchmark}/run', 'myrun.tar.xz'), remote=remote_dir)
-        cmd = f'xz -dc myrun.tar.xz | tar -xvf - --strip-components=1'# 
-        with sshC.cd(remote_dir):
-            ret=sshC.run(cmd, hide=True, timeout=100)
-            assert not ret.failed
-        
-        result = sshC.put(local=myscript, remote=remote_dir)
+    host="jiayu@dss4090.local"
+    sshC=Connection(host=host)
+    remote_dir = f'/home/jiayu/spec2017_run/{benchmark}'
+    sshC.run(f'rm -rf {remote_dir}')
+    sshC.run(f'mkdir -p {remote_dir}')
+    result = sshC.put(local=os.path.join(f'/home/jiayu/cpu2017/benchspec/CPU/{benchmark}/run', 'myrun.tar.xz'), remote=remote_dir)
+    cmd = f'xz -dc myrun.tar.xz | tar -xvf - --strip-components=1'# 
+    with sshC.cd(remote_dir):
+        ret=sshC.run(cmd, hide=True, timeout=100)
+        assert not ret.failed
+    
+    result = sshC.put(local=myscript, remote=remote_dir)
+
+    # for device in [1,2,3,4,5,6]:
+    #     host="nvidia@TX2-{}.local".format(device)
+    #     sshC=Connection(host=host)
+    #     remote_dir = f'/home/nvidia/spec2017_run/{benchmark}'
+    #     sshC.run(f'rm -rf {remote_dir}')
+    #     sshC.run(f'mkdir -p {remote_dir}')
+    #     result = sshC.put(local=os.path.join(f'/home/jiayu/cpu2017/benchspec/CPU/{benchmark}/run', 'myrun.tar.xz'), remote=remote_dir)
+    #     cmd = f'xz -dc myrun.tar.xz | tar -xvf - --strip-components=1'# 
+    #     with sshC.cd(remote_dir):
+    #         ret=sshC.run(cmd, hide=True, timeout=100)
+    #         assert not ret.failed
+
+    #     result = sshC.put(local=myscript, remote=remote_dir)
         
         
         
         
 
 
-def modify_line(filename, line_number, text):
-    """
-    Modifies a specific line in a file.
+# def modify_line(filename, line_number, text):
+#     """
+#     Modifies a specific line in a file.
 
-    :param filename: The name of the file to be modified.
-    :param line_number: The line number to modify (1-based index).
-    :param text: The new text that will replace the old line.
-    """
-    # Read the file and store the lines in a list
-    with open(filename, 'r') as file:
-        lines = file.readlines()
+#     :param filename: The name of the file to be modified.
+#     :param line_number: The line number to modify (1-based index).
+#     :param text: The new text that will replace the old line.
+#     """
+#     # Read the file and store the lines in a list
+#     with open(filename, 'r') as file:
+#         lines = file.readlines()
 
-    # Modify the specific line
-    if 0 < line_number <= len(lines):
-        lines[line_number - 1] = text + '\n'
-    else:
-        raise IndexError("Line number out of range.")
+#     # Modify the specific line
+#     if 0 < line_number <= len(lines):
+#         lines[line_number - 1] = text + '\n'
+#     else:
+#         raise IndexError("Line number out of range.")
 
-    # Write the modified content back to the file
-    with open(filename, 'w') as file:
-        file.writelines(lines)
+#     # Write the modified content back to the file
+#     with open(filename, 'w') as file:
+#         file.writelines(lines)
 
 # Example usage:
 # modify_line(f'/home/jiayu/cpu2017/benchspec/CPU/520.omnetpp_r/run/{dir_name}/omnetpp.ini', 3, 'sim-time-limit = 0.03s')

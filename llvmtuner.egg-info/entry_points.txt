@@ -1,2 +1,3 @@
 [console_scripts]
 clangopt = llvmtuner.clangopt:main
+clangxxopt = llvmtuner.clangxxopt:main

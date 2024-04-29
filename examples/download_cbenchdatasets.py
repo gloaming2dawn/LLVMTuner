@@ -7,7 +7,7 @@ for file in files:
     # cmd = f'wget https://sourceforge.net/projects/cbenchmark/files/cDatasets/V1.1/{file}'
     # subprocess.run(cmd, cwd =cwd, shell=True)
 
-    for device in ['4']:#'1','3','4','5','6'
+    for device in ['1','3','4','5','6']:#
         cmd = f'scp {file} nvidia@TX2-{device}.local:/home/nvidia/cBench_V1.1/'
         subprocess.run(cmd, cwd =cwd, shell=True)
         host=f"nvidia@TX2-{device}.local"
