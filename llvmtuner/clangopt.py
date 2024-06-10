@@ -95,13 +95,13 @@ class Clangopt:
             
         
         
-        
+    
     def _single_compile(self, x):
         source=x['file']
         reldir,filename=os.path.split(source)
         fileroot,fileext=os.path.splitext(filename)
         
-        if self.hotfiles and filename not in self.hotfiles: 
+        if self.hotfiles and fileroot not in self.hotfiles: 
             opt_str = args.optlevel
         else:
             if isinstance(self.params, (str)):
@@ -202,8 +202,8 @@ class Clangopt:
             if self.hotfiles: 
                 for x in self.cdb:
                     reldir,filename = os.path.split(x['file'])
-                    # fileroot,fileext=os.path.splitext(filename)
-                    if filename in self.hotfiles:
+                    fileroot,fileext=os.path.splitext(filename)
+                    if fileroot in self.hotfiles:
                         flag = self._single_compile(x)
                         if not flag:
                             final_flag=False
@@ -310,6 +310,8 @@ class Clangopt:
         
         # cmd = os.path.join(llvm_dir,'llc')+'  -O3 {} -o {} --print-machine-bfi 2> {}'.format(IR_opt, asm, machinebfi)
         cmd = os.path.join(llvm_dir,'llc')+' -O3 -filetype=obj -relocation-model=pic {} -o {}'.format(IR_opt, obj)
+        # cmd = os.path.join(llvm_dir,'llc')+' -O3 -filetype=obj {} -o {}'.format(IR_opt, obj)
+        # cmd = os.path.join(llvm_dir,'clang')+' -c {} -o {}'.format(IR_opt, obj)
         flag, ret = cls.runcmd(cmd, cwd)
         print(cmd,cwd)
         assert flag == True, cmd

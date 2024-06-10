@@ -178,12 +178,12 @@ def train_gp(train_x, train_y, cat_dims=[], use_ard=True, use_input_warping=Fals
     posterior = model.posterior(train_x)
     y_pre = posterior.mean.view(-1).cpu().detach().numpy()
     y_train = train_y.squeeze().cpu().detach().numpy()
-    residuals = y_pre - y_train
-    squared_residuals = residuals ** 2
-    rmse = np.sqrt(np.mean(squared_residuals))
-    print('rmse:',rmse)
-    max_error = np.max(np.abs(residuals))
-    print('max_error:',max_error)
+    # residuals = y_pre - y_train
+    # squared_residuals = residuals ** 2
+    # rmse = np.sqrt(np.mean(squared_residuals))
+    # print('rmse:',rmse)
+    # max_error = np.max(np.abs(residuals))
+    # print('max_error:',max_error)
 
 
     # print(f'Noise constraint: {likelihood.noise_covar.raw_noise_constraint}')    

@@ -1,0 +1,14 @@
+# And now some values from the actual SPEC mail archives:
+# An osgcpu-ish mix (~160 secs):
+#704 12 26 16 836 1
+# An osgsupport-ish mix (~155 secs):
+535 13 25 24 1091 1
+# An osgweb-ish mix (~275 secs):
+#957 12 23 26 1014 1
+
+# These values are used for testing and debugging only
+#75 5 19 18 2500 1
+#5 5 19 18 50 1
+#70 5 19 18 250 1
+#2 5 19 18 120 1
+

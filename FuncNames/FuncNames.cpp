@@ -35,7 +35,9 @@ namespace {
 
 // This method implements what the pass does
 void visitor(Function &F) {
+  if (!F.isDeclaration()){
     errs() << F.getName() << "\n";
+  }
     // errs() << "(llvm-tutor)   number of arguments: " << F.arg_size() << "\n";
 }
 

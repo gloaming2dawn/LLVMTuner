@@ -12,6 +12,7 @@ llvmtuner/globalvar.py
 llvmtuner/phase_order.py
 llvmtuner/searchspace.py
 llvmtuner/show_features.py
+llvmtuner/utils.py
 llvmtuner.egg-info/PKG-INFO
 llvmtuner.egg-info/SOURCES.txt
 llvmtuner.egg-info/dependency_links.txt

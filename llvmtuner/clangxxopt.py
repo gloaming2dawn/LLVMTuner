@@ -102,7 +102,7 @@ class Clangopt:
         reldir,filename=os.path.split(source)
         fileroot,fileext=os.path.splitext(filename)
         
-        if self.hotfiles and filename not in self.hotfiles: 
+        if self.hotfiles and fileroot not in self.hotfiles: 
             opt_str = args.optlevel
         else:
             if isinstance(self.params, (str)):
@@ -203,8 +203,8 @@ class Clangopt:
             if self.hotfiles: 
                 for x in self.cdb:
                     reldir,filename = os.path.split(x['file'])
-                    # fileroot,fileext=os.path.splitext(filename)
-                    if filename in self.hotfiles:
+                    fileroot,fileext=os.path.splitext(filename)
+                    if fileroot in self.hotfiles:
                         flag = self._single_compile(x)
                         if not flag:
                             final_flag=False

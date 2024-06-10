@@ -227,7 +227,7 @@ LIBXML2_XMLLINT_EXECUTABLE:FILEPATH=/usr/bin/xmllint
 LLVM_DIR:PATH=/home/jiayu/llvm17.0.6/lib/cmake/llvm
 
 //LLVM installation directory
-LT_LLVM_INSTALL_DIR:PATH=/home/jiayu/17.0.6
+LT_LLVM_INSTALL_DIR:PATH=/home/jiayu/llvm17.0.6
 
 //Path to a file.
 LibEdit_INCLUDE_DIRS:PATH=/usr/include

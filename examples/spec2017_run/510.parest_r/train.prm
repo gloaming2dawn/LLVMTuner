@@ -1,0 +1,76 @@
+subsection Global options
+  set Output directory             = .
+  set Output format                = vtk
+  set Number of experiments        = 4
+  set Data                         = single target
+  set Coarse mesh                  = 8x8x4
+end
+
+subsection Experiment description
+  set Forcing mode                 = gaussian
+
+  subsection Measurement representation
+    set Measurement type           = synthetic
+
+    subsection Synthetic data
+      set Finite element           = linear
+      set Noise level              = 0.0
+      set Noise type               = multiplicative
+      set Output projected solution= false
+      set Unknown source amplitude = 1
+      set Unknown source phase     = 0
+    end
+  end
+end
+
+subsection Discretization
+  subsection Distributed parameter field
+    set Finite element            = discontinuous constant
+    set Regularization functional = L2 norm#H1 seminorm
+    set Regularization parameter  = 1e-7
+    set Initial refinement        = 0
+    set Refinements on measurement boundary = g
+    set Refinement fraction       = 0.4
+    set Coarsening fraction       = 0.05
+    set Lower bound               = 0.0001
+    set Upper bound               = 0.02
+
+    subsection Regularization strategy
+      set Strategy                = reduce with misfit
+      set Minimal misfit ratio    = 3
+    end
+  end
+
+  subsection Tomography slave
+    set Finite element                 = linear
+    set Misfit functional              = L2 boundary norm
+    set Renumber dofs by Cuthill-McKee = false
+    set Initial refinement             = 0
+    set Refinements on measurement boundary = gmg
+    set Refinement criterion           = grad grad u
+    set Refinement fraction            = 0.35
+    set Coarsening fraction            = 0.05
+    set Output grids                   = false
+    set Evaluations                    = 
+    set Output magnitude and phase     = true
+  end
+end
+
+subsection Newton method
+  subsection Mesh refinement details
+    set Min initial steps     = 2
+    set Max initial steps     = 4
+    set Initial reduction     = 1e-10
+    set Reduction per mesh    = 1e-4
+  end
+
+  set Max inner CG iterations = 3000
+  set Reduction goal          = 1e-3
+  set Output step interval    = 1
+  set Maximal number of iterations = 2
+  set Target measurement misfit = 0
+  set Solver type               = cg
+  set Write hessian             = false
+end
+
+

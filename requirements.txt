@@ -4,4 +4,5 @@ nevergrad==0.5.0
 numpy==1.21.6
 scikit-learn==1.0.2
 scipy==1.7.3
+fabric==2.7.1
 pathos==0.3.0

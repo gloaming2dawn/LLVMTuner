@@ -1,0 +1,127 @@
+<?xml version="1.0"?>
+<schema xmlns="http://www.w3.org/2001/XMLSchema"
+        targetNamespace="http://www.schemaTest.org/train"
+        xmlns:big="http://www.schemaTest.org/train"
+        elementFormDefault="qualified">
+
+  <element name="BOOKS">
+  <complexType>
+    <sequence>
+      <element maxOccurs="unbounded" name="PLAY" type="big:PLAYType" />
+    </sequence>
+  </complexType>
+  </element>
+  
+  <complexType name="PLAYType">
+    <sequence>
+      <element name="TITLE" type="big:BOOKTITLEType" />
+      <element name="FM" type="big:FMType" />
+      <element name="PERSONAE" type="big:PERSONAEType" />
+      <element name="SCNDESCR" type="string" />
+      <element name="PLAYSUBT" type="string" />
+      <element name="PROLOGUE" type="big:IPSType" minOccurs="0" />
+      <element name="INDUCT" type="big:IPSType" minOccurs="0" />
+      <element maxOccurs="unbounded" name="ACT" type="big:ACTType" />
+    </sequence>
+  </complexType>
+
+  <complexType name="ACTType">
+    <sequence>
+      <element name="TITLE" type="string" />
+      <choice maxOccurs="unbounded">
+        <element name="PROLOGUE" type="big:IPSType" />
+        <element name="SCENE" type="big:IPSType" />
+      </choice>
+      <element name="EPILOGUE" type="anyType" minOccurs="0"/>
+    </sequence>
+  </complexType>
+
+  <complexType name="IPSType">
+    <sequence>
+      <element name="TITLE" type="string" />
+      <choice maxOccurs="unbounded">
+        <element name="STAGEDIR" type="string" />
+        <element name="SUBHEAD" type="string" />
+        <element name="SCENE" type="big:IPSType" />
+        <element name="SPEECH" type="big:SPEECHType" />
+      </choice>
+    </sequence>
+  </complexType>
+
+  <complexType name="SPEECHType">
+    <choice maxOccurs="unbounded">
+      <element name="SPEAKER" type="string" />
+      <element name="LINE" type="anyType" />
+      <element name="STAGEDIR" type="string" />
+      <element name="SUBHEAD" type="anyType" />
+      <element name="EPILOGUE" type="anyType" />
+    </choice>
+  </complexType>
+
+  <complexType name="PERSONAEType">
+    <sequence>
+      <element name="TITLE" type="string" />
+      <choice maxOccurs="unbounded">
+        <element name="PGROUP" type="big:PGROUPType" />
+        <element name="PERSONA" type="string" />
+      </choice>
+    </sequence>
+  </complexType>
+
+  <complexType name="PGROUPType">
+    <sequence>
+      <element maxOccurs="unbounded" name="PERSONA" type="string" />
+      <element name="GRPDESCR" type="string" />
+    </sequence>
+  </complexType>
+
+  <complexType name="FMType">
+    <sequence>
+      <element maxOccurs="unbounded" name="P" type="string" />
+    </sequence>
+  </complexType>
+
+  <element name="PERSONA" type="string"/>
+  
+  <simpleType name="BOOKTITLEType">
+    <restriction base="string">
+      <enumeration value="The Second Part of Henry the Fourth"/>
+      <enumeration value="The Tragedy of Othello, the Moor of Venice"/>
+      <enumeration value="Much Ado about Nothing"/>
+      <enumeration value="The First Part of Henry the Sixth"/>
+      <enumeration value="The Merchant of Venice"/>
+      <enumeration value="The Tragedy of Macbeth"/>
+      <enumeration value="The Merry Wives of Windsor"/>
+      <enumeration value="Measure for Measure"/>
+      <enumeration value="Love's Labor's Lost"/>
+      <enumeration value="The Tragedy of King Lear"/>
+      <enumeration value="The Tragedy of King Richard the Second"/>
+      <enumeration value="The Life and Death of King John"/>
+      <enumeration value="The Tragedy of Julius Caesar"/>
+      <enumeration value="The Famous History of the Life of Henry the Eighth"/>
+      <enumeration value="The Third Part of Henry the Sixth"/>
+      <enumeration value="The Tragedy of Titus Andronicus"/>
+      <enumeration value="The Life of Henry the Fifth"/>
+      <enumeration value="The First Part of Henry the Fourth"/>
+      <enumeration value="The Tragedy of Hamlet, Prince of Denmark"/>
+      <enumeration value="A Midsummer Night's Dream"/>
+      <enumeration value="Cymbeline"/>
+      <enumeration value="The Tragedy of Coriolanus"/>
+      <enumeration value="The Comedy of Errors"/>
+      <enumeration value="As You Like It"/>
+      <enumeration value="All's Well That Ends Well"/>
+      <enumeration value="The Tragedy of Antony and Cleopatra"/>
+      <enumeration value="Pericles, Prince of Tyre"/>
+      <enumeration value="The Tragedy of Romeo and Juliet"/>
+      <enumeration value="The Tragedy of Richard the Third"/>
+      <enumeration value="Twelfth Night, or What You Will"/>
+      <enumeration value="The Taming of the Shrew"/>
+      <enumeration value="The Tempest"/>
+      <enumeration value="The Life of Timon of Athens"/>
+      <enumeration value="The History of Troilus and Cressida"/>
+      <enumeration value="The Two Gentlemen of Verona"/>
+      <enumeration value="The Winter's Tale"/>
+      <enumeration value="The Second Part of Henry the Sixth"/>
+    </restriction>
+  </simpleType>
+</schema>

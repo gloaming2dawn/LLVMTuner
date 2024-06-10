@@ -1,0 +1,5 @@
+warning: Maximum frequency rate (3500 Hz) exceeded, throttling from 4999 Hz to 3500 Hz.
+         The limit can be raised via /proc/sys/kernel/perf_event_max_sample_rate.
+         The kernel will lower it when perf's interrupts take too long.
+         Use --strict-freq to disable this throttling, refusing to record.
+Workload failed: No such file or directory

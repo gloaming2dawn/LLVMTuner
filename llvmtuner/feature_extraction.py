@@ -225,8 +225,7 @@ def read_optstats_from_cfgpath(cfg_path):
     with open(cfg_path, 'r') as file:
         cfg=json.load(file)
     
-    for filename in cfg['hotfiles']:
-        fileroot = fileroot,fileext=os.path.splitext(filename)
+    for fileroot in cfg['hotfiles']:
         if isinstance(cfg['params'], (str)):
             opt_str=cfg['params']
         else:

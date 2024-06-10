@@ -157,9 +157,9 @@ class BO:
     def __init__(
         self,
         fun,
-        len_seq,
         budget, 
         passes,
+        len_seq=100,
         precompiled_path=None, # path that contains a large number of precompiled IR and their optimization configs
         n_parallel=50,
         n_init=20,
@@ -198,10 +198,7 @@ class BO:
         if device == "cuda":
             assert torch.cuda.is_available(), "can't use cuda if it's not available"
 
-        self.fun=fun
-        self.gen_ir_fun=fun.gen_optIR
-        self.build_fun = fun.build
-        self.eval_fun = fun.measure
+        self.fun = fun        
         self.tmp_dir=fun.tmp_dir
         self.passes=passes
         # self.pass2num={}
@@ -342,10 +339,16 @@ class BO:
 
         return new_cands
     
+    @staticmethod
+    def aaa(params):
+        return len(params)
+
+    # @staticmethod
+    # def gen_ir_fun(params):
+    #     BO.gen_ir_fun(params)
+        
     
-        
-        
-        
+    
     def genIR_and_update(self, new_cands):   
         t0 = time()   
         params_list=[]
@@ -355,11 +358,19 @@ class BO:
             for fileroot in new_cands:
                 params[fileroot]=new_cands[fileroot][i]
             params_list.append(params)
-            
+ 
+
+
+        # import pickle
+        # pickle_bytes = pickle.dumps(self.budget)
+        # pickle_bytes = pickle.dumps(self.aaa)
+        # pickle_bytes = pickle.dumps(self.fun.gen_optIR)
         
         with Pool() as p:
-            p.map(self.gen_ir_fun, params_list)
-            
+            # p.map(self.fun.gen_optIR, params_list)
+            inputs = [(params, self.fun.tmp_dir, self.fun.hotfiles, self.fun.cmd, self.fun.cfg_dir, self.fun.build_dir, self.fun.profdata) for params in params_list]
+            p.map(self.fun.static_gen_optIR, inputs)
+        
         if self.verbose:
             print("Opt {} candidates cost {:.4f}".format(len(params_list), time()-t0))        
             
@@ -566,29 +577,30 @@ class BO:
         self.failcount = 0
         
         # firstly build the program in '-O3'
-        assert self.build_fun('default<O3>')
+        assert self.fun.build('default<O3>')
         
         # Initialization
         initial_params_list = []
         ii=0
-        initial_params = {} 
-        if self.initial_guess is None:
-            ii=1
-            for filename in self.fun.hotfiles:
-                fileroot,fileext=os.path.splitext(filename)
-                initial_params[fileroot]='default<O3>'
+        # initial_params = {} 
+        # if self.initial_guess is None:
+        #     ii=1
+        #     for filename in self.fun.hotfiles:
+        #         fileroot,fileext=os.path.splitext(filename)
+        #         initial_params[fileroot]='default<O3>'
 
-        else:
-            ii=1
-            initial_params={}
-            if isinstance(self.initial_guess, (str)):
-                for filename in self.fun.hotfiles:
-                    fileroot,fileext=os.path.splitext(filename)
-                    initial_params[fileroot]=self.initial_guess
-            else:
-                initial_params = self.initial_guess
+        # else:
+        #     ii=1
+        #     initial_params={}
+        #     if isinstance(self.initial_guess, (str)):
+        #         for filename in self.fun.hotfiles:
+        #             fileroot,fileext=os.path.splitext(filename)
+        #             initial_params[fileroot]=self.initial_guess
+        #     else:
+        #         initial_params = self.initial_guess
 
-        initial_params_list.append(initial_params)
+        # initial_params_list.append(initial_params)
+        
         # self.initial_guess=None
         
         # fX_next = self.fun(initial_params)
@@ -598,7 +610,6 @@ class BO:
         #     self.tell(params, fX_next)
             
             
-        
         for _ in range(self.n_init-ii):
             if self.precompiled_path is None:
                 seq=random.choices(self.passes, k=self.len_seq)
@@ -627,11 +638,14 @@ class BO:
         
         
         print('len_init_samples:',len(initial_params_list))
+
         
         for params in initial_params_list:
             fX_next = self.fun(params)
             if fX_next != inf:
                 self.tell(params, fX_next)
+        
+        
                 
             
                 
@@ -776,13 +790,13 @@ class BO:
                     if fX_next<self.best_y:
                         previous_vec = self.seq2vec[fileroot][self.best_params[fileroot]]
                         vec = self.seq2vec[fileroot][params_next[fileroot]]
-                        changes = {}
-                        for key, value1, value2 in zip(self.file2feature_names[fileroot], previous_vec, vec):
-                            changes[key] = (round(value1, 2), round(value2, 2))
-                            # if value1 != value2:
-                            #     # changes[key] = (value1, value2)
-                            #     changes[key] = (round(value1, 2), round(value2, 2))
-                        print(json.dumps(changes))#,indent=4
+                        # changes = {}
+                        # for key, value1, value2 in zip(self.file2feature_names[fileroot], previous_vec, vec):
+                        #     changes[key] = (round(value1, 2), round(value2, 2))
+                        #     # if value1 != value2:
+                        #     #     # changes[key] = (value1, value2)
+                        #     #     changes[key] = (round(value1, 2), round(value2, 2))
+                        # print(json.dumps(changes))#,indent=4
                     # for key, value in changes.items():
                     #     print(f"{key}: {value}")
                     
@@ -817,7 +831,8 @@ class BO:
             #Avoid OOM
             gc.collect()
             torch.cuda.empty_cache()  
-            
+
+        return self.fun.best_params, self.fun.best_y    
         # print final results
         # print('results are saved to {}', self.result_file)
         # print('the best reult are saved to {}', self.best_result_file)
