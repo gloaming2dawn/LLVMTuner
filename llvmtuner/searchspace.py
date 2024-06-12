@@ -1,9 +1,5 @@
 # -*- coding: utf-8 -*-
-"""
-Created on Fri Feb 11 00:12:22 2022
 
-@author: jiayu
-"""
 import time
 import subprocess
 import os

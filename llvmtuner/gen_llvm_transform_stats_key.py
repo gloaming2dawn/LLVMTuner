@@ -1,9 +1,5 @@
 # -*- coding: utf-8 -*-
-"""
-Created on Wed Jan  4 22:01:49 2023
 
-@author: jiayu
-"""
 #python ../llvmtuner/gen_llvm_transform_stats_key.py --llvm-srcdir=/home/jiayu/llvm-project/
 import os, argparse, re, json, sys
 from multiprocessing import Pool

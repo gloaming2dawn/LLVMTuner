@@ -7,6 +7,7 @@
 ### 1. 安装llvmtuner
 首先安装python环境
 >conda create -n llvmtuner python=3.9.9
+>conda activate llvmtuner
 
 首先下载代码
 >git clone https://github.com/gloaming2dawn/LLVMTuner.git

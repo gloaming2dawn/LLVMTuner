@@ -1,9 +1,4 @@
 # -*- coding: utf-8 -*-
-"""
-Created on Tue Dec  6 17:53:52 2022
-
-@author: jiayu
-"""
 import os
 import subprocess
 import json

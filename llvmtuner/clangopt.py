@@ -1,9 +1,4 @@
 # -*- coding: utf-8 -*-
-"""
-Created on Tue Mar  1 12:48:39 2022
-
-@author: scjzhadmin
-"""
 import time
 from copy import deepcopy
 # import numpy as np
@@ -13,7 +8,8 @@ import subprocess
 import sys
 import hashlib
 from pathlib import Path
-from multiprocessing import Pool
+# from multiprocessing import Pool
+import fcntl
 # import time
 # import invoke
 # import re
@@ -38,7 +34,18 @@ parser.add_argument('--llvm-dir', default='', help='')
 args, unknown = parser.parse_known_args()
 
 
-
+def create_file(output):
+    # 获取文件锁
+    with open(output, "w") as file:
+        fcntl.flock(file.fileno(), fcntl.LOCK_EX)
+        # 检查文件是否已经存在
+        script_content = '#!/bin/bash\necho "fake build!"\n'
+        file.write(script_content)
+        os.chmod(output, 0o755)
+        # if not os.path.exists(output):
+        #     file.write(script_content)
+        # 释放文件锁
+        fcntl.flock(file.fileno(), fcntl.LOCK_UN)
 
 class Clangopt:
     def __init__(self):
@@ -139,7 +146,7 @@ class Clangopt:
         if '-o' in cmd:
             j=cmd.index('-o')
             del cmd[j:j+2]
-        cmd=[x for x in cmd if x!='---xxx' and x!='-c' and x!='-S' and not x.endswith('.c') and not x.endswith('.cpp') and not x.endswith('.cc') and not x.endswith('.cxx')]
+        cmd=[x for x in cmd if x!='---xxx' and x!='-c' and x!='-S' and not x.endswith('.c') and not x.endswith('.cpp') and not x.endswith('.cc') and not x.endswith('.cxx') and not x.endswith('.C')]
         cflags = ' '.join(cmd[1:])
         
         if args.instrument_ir or not os.path.isfile(IR_opt):#
@@ -179,12 +186,13 @@ class Clangopt:
         final_flag=True
         # 如果该命令为链接obj文件生成二进制
         if self.cdb == None:
-            if not args.gen_ir:
-                if args.instrument_ir:
-                    link_cmd = ' '.join(self.clang_cmd) + ' -fprofile-generate'
-                else:
-                    link_cmd = ' '.join(self.clang_cmd)
-                print(link_cmd)
+            if args.instrument_ir:
+                link_cmd = ' '.join(self.clang_cmd) + ' -fprofile-generate'
+            else:
+                link_cmd = ' '.join(self.clang_cmd)
+            print(link_cmd)
+
+            if not args.gen_ir:#如果是正常build
                 ret = subprocess.run(link_cmd, cwd =os.getcwd(), shell=True, capture_output=True)
                 assert ret.returncode == 0, [os.getcwd(), link_cmd]
                 # if '-o' in self.clang_cmd:
@@ -195,8 +203,19 @@ class Clangopt:
                 # cp_cmd = f'cp {output} {tmp_dir}'
                 # ret = subprocess.run(cp_cmd, shell=True, capture_output=True)
                 # assert ret.returncode == 0
-            else:
+            else:#如果只是生成IR，而不是生成最终二进制
+                if '-o' in self.clang_cmd:
+                    j = self.clang_cmd.index('-o')
+                    outputname = self.clang_cmd[j+1]
+                else:
+                    outputname = 'a.out'
+                output = os.path.join(os.getcwd(), outputname)
+                if not os.path.exists(output): #编译脚本中可能会对生成的binary做copy之类的操作，为避免报错，创建一个假文件
+                    # ret = subprocess.run(link_cmd, cwd =os.getcwd(), shell=True, capture_output=True)
+                    # assert ret.returncode == 0, [os.getcwd(), link_cmd]
+                    create_file(output)
                 return
+
         
         else:
             if self.hotfiles: 
@@ -218,7 +237,7 @@ class Clangopt:
                     Path(x['file']).touch()
             
             
-            if self.link:
+            if self.link:#如果命令为clang *.c -o a.out形式，既有编译为.o也有链接.o为目标文件的操作
                 
                 link_cmd_wo_objs = [aa for aa in self.clang_cmd if not aa.endswith('.c') and not aa.endswith('.cpp') and not aa.endswith('.cc') and not aa.endswith('.cxx')]
                 link_cmd_wo_objs = ' '.join(link_cmd_wo_objs)
@@ -248,6 +267,7 @@ class Clangopt:
         '''
         try:
             ret=subprocess.run(cmd, cwd=cwd, capture_output=True,shell=True,timeout=timeout)
+            assert ret.returncode == 0, [cmd,cwd]
             if ret.returncode == 0:
                 flag=True
             else:

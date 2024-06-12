@@ -35,6 +35,7 @@ class random_optimizer:
         t0 = time.time()
         with Pool() as p:
             flags = p.map(self.fun.gen_optIR, params_list)
+            # flags = p.map(self.fun.build, params_list) # this is wrong, because parallel build will cause conflict (binary file is the same)
         print(f'time of parallel generating {self.budget} optimized IRs:',time.time()-t0)
         print(f"Number of successful compilation: {sum(flags)}")
 

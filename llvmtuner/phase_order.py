@@ -1,9 +1,5 @@
 # -*- coding: utf-8 -*-
-"""
-Created on Tue Mar  1 12:48:39 2022
 
-@author: scjzhadmin
-"""
 from copy import deepcopy
 import numpy as np
 import json
