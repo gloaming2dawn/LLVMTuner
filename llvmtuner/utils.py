@@ -83,7 +83,7 @@ class run_and_eval:
         # 重置运行目录，保证每次运行时不受到生成文件的影响
         current_contents = get_directory_contents(self.run_dir)
         if current_contents != original_contents:
-            reset_directory(current_directory, original_contents)
+            reset_directory(self.run_dir, original_contents)
         return runtime
 
 class run_and_eval_ssh:
