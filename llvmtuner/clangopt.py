@@ -267,12 +267,12 @@ class Clangopt:
         '''
         try:
             ret=subprocess.run(cmd, cwd=cwd, capture_output=True,shell=True,timeout=timeout)
-            assert ret.returncode == 0, [cmd,cwd]
+            # assert ret.returncode == 0, [cmd,cwd]
             if ret.returncode == 0:
                 flag=True
             else:
                 flag=False
-        except subprocess.TimeoutExpired:
+        except:
             flag=False
             ret=None
         return flag, ret
@@ -313,6 +313,7 @@ class Clangopt:
         cmd = f'{os.path.join(llvm_dir,"opt")} -passes="{opt_params}" {IR_pgouse} -o {IR_opt} -stats -stats-json 2> {opt_stats}'
         flag, ret = cls.runcmd(cmd, cwd)
         if not flag:
+            print('wrong saved stats', opt_stats)
             os.remove(opt_stats)
         # os.remove(IR_pgouse)
         os.remove(IR)

@@ -1,16 +1,25 @@
-
+# from memory_profiler import profile
 from math import inf
 import hashlib
 import math
 import json
 import os
-from time import time
+from time import time, sleep
 import sys
 from copy import deepcopy
 import subprocess
 import random
 # from pathos.multiprocessing import Pool
+# import multiprocessing as mp
+# mp.set_start_method('spawn', force=True)
 from multiprocessing import Pool
+# from torch.multiprocessing import Pool, Process, set_start_method
+# try:
+#      set_start_method('spawn')
+# except RuntimeError:
+#     pass
+
+# from multiprocessing import Pool
 import itertools
 
 import gpytorch
@@ -45,6 +54,33 @@ import nevergrad as ng
 import llvmtuner
 from llvmtuner.searchspace import default_space, passlist2str
 from llvmtuner.feature_extraction import read_optstats_from_cfgjsonlist, stats2vec, read_optstats_from_cfgpath
+
+
+import psutil
+import cProfile
+import io
+import pstats
+
+
+def get_pytorch_threads():
+    """ 获取当前 Python 进程由于 PyTorch 占用的线程信息 """
+    current_pid = os.getpid()
+    process = psutil.Process(current_pid)
+    
+    print(f"当前进程 PID: {current_pid}")
+    
+    try:
+        # 获取所有线程
+        threads = process.threads()
+        for thread in threads:
+            print(f"线程 ID: {thread.id}, 用户时间: {thread.user_time}, 系统时间: {thread.system_time}")
+    except psutil.AccessDenied:
+        print("无法访问进程的线程信息。")
+    except psutil.NoSuchProcess:
+        print("进程不存在。")
+
+
+
 
 def read_seq_json_from_subdirs(base_dir):
     seq_strings = []  # 存储从seq.json文件中读取的字符串
@@ -83,9 +119,16 @@ def permu_best_k(best_params, k, cands):
         cand_params[fileroot] = opt_str
     return cand_params
 
-
-def nonzero_rows(matrix, inds):
+def find_allzero_columns(matrix):
+    return np.where(np.all(matrix == 0, axis=0))[0]
+def find_anynonzero_rows(matrix, inds):
     return matrix[:, inds].sum(axis=1)!=0
+
+def find_allpositive_columns(matrix):
+    return np.where(np.all(matrix > 0, axis=0))[0]
+def find_anyzero_rows(matrix, inds):
+    X = matrix[:, inds]
+    return np.any(X == 0, axis=1)
 
 def dict_changes(A, B):
     changes = {}
@@ -293,10 +336,10 @@ class BO:
         if self.failcount > self.failtol:
             self.k = max([int(self.k/2), 1]) 
             self.failcount = 0 
-            
     
     
-        
+    
+    
     def ask(self):
         
         if len(list(self.cands.values())[0]) > self.max_cand_seqs:
@@ -337,7 +380,7 @@ class BO:
     # @staticmethod
     # def gen_ir_fun(params):
     #     BO.gen_ir_fun(params)
-        
+    
     
     
     def genIR_and_update(self, new_cands):   
@@ -377,11 +420,13 @@ class BO:
        
         X = np.array(_X)
         fX = np.expand_dims(np.array(_fX), axis=1)
+
         # Figure out what device we are running on
-        if len(X) < self.min_cuda:
-            device, dtype = torch.device("cpu"), torch.float64
-        else:
-            device, dtype = self.device, self.dtype
+        device, dtype = self.device, self.dtype
+        # if len(X) < self.min_cuda:
+        #     device, dtype = torch.device("cpu"), torch.float64
+        # else:
+        #     device, dtype = self.device, self.dtype
         
         # if (fX>0).all():
         #     # self.pt=PowerTransformer(method='box-cox')
@@ -423,6 +468,10 @@ class BO:
         # We may have to move the GP to a new device
         # device=torch.device("cpu")
         gp_model = gp_model.to(dtype=self.dtype, device=self.device)
+        # because of https://github.com/cornellius-gp/gpytorch/issues/1619, we run train() and eval() after moving from cpu to gpu
+        gp_model.train()
+        gp_model.eval()
+
         if self.acqf =='EI':
             acqf = qExpectedImprovement(gp_model, self.train_y.max().to(dtype=self.dtype, device=self.device))
             # acqf = qNoisyExpectedImprovement(gp_model, self.train_x.to(dtype=self.dtype, device=self.device))
@@ -444,6 +493,7 @@ class BO:
         acq_values = y.ravel()
         if self.verbose:
             print("Predicting cost {:.4f}".format(time()-t0))
+        del gp_model, X_cand_torch, acqf
         return acq_values
     
     
@@ -453,7 +503,7 @@ class BO:
         fX_next = self.fun(params_next)
         return params_next, fX_next
         
-
+    
     
     
     
@@ -528,7 +578,7 @@ class BO:
                 cfg['params'][fileroot]=seq
                 cfg_json=json.dumps(cfg)
                 cfg_json_list.append(cfg_json)
-            t0 = time()
+            # print(cfg_json_list)
             stats_list = read_optstats_from_cfgjsonlist(cfg_json_list)
             x = zip(stats_list, seqs)
             # 去除失败的seq
@@ -536,7 +586,6 @@ class BO:
             seqs = list(filtered_seqs)
             stats_list = list(filtered_stats)
             cands[fileroot] = seqs
-
 
             # fixme: check failed seqs
             # print("read_optstats_from_cfgjsonlist cost {:.4f}".format(time()-t0))
@@ -560,7 +609,7 @@ class BO:
             print("Feature_extraction cost {:.4f}".format(time()-t0))
         return self.seq2vec
 
-
+    # @profile
     def minimize(self):
         """Run the full optimization process."""
         
@@ -648,29 +697,41 @@ class BO:
 
         
         # print('cost time:', time()-t0)
-        if self.precompiled_path is None:
-            new_cands = self.ask()
-            if new_cands is not None:
-                self.genIR_and_update(new_cands)
-                new_cands, _, _ = self.cands2vecs(new_cands)
-                for fileroot in self.cands:
-                    self.cands[fileroot].extend(new_cands[fileroot])
-                    
+
+        # if self.precompiled_path is None:
+        #     new_cands = self.ask()
+        #     if new_cands is not None:
+        #         self.genIR_and_update(new_cands)
+        #         new_cands, _, _ = self.cands2vecs(new_cands)
+        #         for fileroot in self.cands:
+        #             self.cands[fileroot].extend(new_cands[fileroot])
         self.feature_extraction()
 
         while self.n_evals < self.budget:
             if self.precompiled_path is None:
                 # ask new candidates
                 new_cands = self.ask()
-                
                 if new_cands is not None:
                     # generate optimized IRs parallely and update
                     self.genIR_and_update(new_cands)
                     new_cands, _, _ = self.cands2vecs(new_cands)
                     for fileroot in self.cands:
                         self.cands[fileroot].extend(new_cands[fileroot])
-                    # extract features
+                    # re-extract features only when new_cands is not None
                     self.feature_extraction()
+                    t0 = time()
+                    # pr = cProfile.Profile()
+                    # pr.enable()
+                    subprocess.run('python parallel_compilation.py', shell=True, cwd=os.path.dirname(os.path.abspath(__file__)))
+                    # pr.disable()
+                    # s = io.StringIO()
+                    # ps = pstats.Stats(pr, stream=s).sort_stats('tottime')
+                    # ps.print_stats()
+                    # print(s.getvalue())
+                    print("ssssssss cost {:.4f}".format(time()-t0))
+            
+                
+
 
 
             # prepare candidates for the next evaluation
@@ -717,12 +778,6 @@ class BO:
             # print('permu_best cost:',time()-t0)
             
             
-            
-            
-            
-            
-            
-            
             t0 = time()
             ff=params2vec(self.seq2vec)
             cand_X=[]
@@ -746,15 +801,16 @@ class BO:
 
             # train GP
             self.gp, _= self.train_gp(self.X, self.fX)
-            
+            # print(next(self.gp.parameters()).device)
             # lengthscales = self.gp.covar_module.base_kernel.lengthscale.cpu().squeeze()
-            # dd = dict(zip(feature_names, lengthscales))
+            # dd = dict(zip(self.feature_names, lengthscales))
             # for iii in lengthscales.argsort()[:20]:
-            #     print(feature_names[iii], lengthscales[iii].item())
-            
+            #     print(self.feature_names[iii], lengthscales[iii].item())
             
             # predict acqf values
             acq_values = self.predict(self.gp, cand_X)
+
+            # terminate_all_children()
             
             # if there are candidates with unexplored features, we explore them
             X_mean = np.mean(np.array(self.X), axis=0)
@@ -767,7 +823,7 @@ class BO:
                     # print(self.feature_names[i])     
             # print(unexplored_feature_names)
             print('Num of unexplored features:',len(unexplored_feature_names))
-            mask = nonzero_rows(np.array(cand_X), inds) #later
+            mask = find_anynonzero_rows(np.array(cand_X), inds) #later
             # acq_values[mask] = acq_values[mask] + 1000
             if np.random.rand() > 0.3:
                 acq_values[mask] = acq_values[mask] + 10000
@@ -817,7 +873,6 @@ class BO:
             
             # # record 
             # self.record()
-            
             
             #Avoid OOM
             gc.collect()

@@ -251,7 +251,7 @@ class Function_wrap:
                 best = self.best_y
                 best_params = self.best_params
                 y=self.__call__(params)
-                if y > best*1.007:
+                if y > best*1.01:
                     seq[i]=pass_seq[i]
                     pass_clear_name = split_by_parentheses(pass_seq[i])[-1].split('<')[0]
                     print(f'pass {pass_clear_name} is good for {fileroot}, from {y} to {best}')
@@ -298,7 +298,7 @@ class Function_wrap:
         else:
             y_list.append(y)
             if self.adaptive_measure:
-                if y>self.best_y*1.2:
+                if y>self.best_y*1.1:
                     print(y_list)
                     return y
                 for _ in range(self.max_n_measure - 1):

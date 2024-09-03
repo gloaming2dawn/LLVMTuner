@@ -1,23 +1,24 @@
 import llvmtuner
 from llvmtuner.searchspace import default_space, passlist2str, parse_O3string
-from llvmtuner.BO.BO import BO
-from llvmtuner.BO.Adalocaloptimizer import Adalocaloptimizer
 
+import os
 import json
+import hashlib
+result_dir = '/home/jiayu/result_llvmtuner_17/cBench/security_sha/cost_model/result.json'
+tmp_dir = '/home/jiayu/result_llvmtuner_17/cBench/security_sha/cost_model/'
+fileroot = 'sha'
+with open(result_dir, 'r') as file:
+    for line in file:
+        config_path, time = json.loads(line)
+print(config_path, time)
+with open(config_path, 'r') as file:
+    config = json.load(file)
+    opt_str=config['params'][fileroot]
+hash_str = hashlib.md5(opt_str.encode('utf-8')).hexdigest()
+IR_dir=os.path.join(tmp_dir, fileroot, f'IR-{hash_str}/')
+print(IR_dir)
+print(config)
+# os.makedirs(IR_dir, exist_ok=True)
 
-# 待写入的数据
-data = {
-    'name': 'John',
-    'age': 30,
-    'city': 'New York'
-}
 
-# 文件路径
-file = 'example.json'
-datas = [data,data]
-# 以追加模式打开文件，并写入JSON数据
-for data in datas:
-    with open(file, 'a') as ff:
-        json.dump(data, ff, indent=4)
-        # ff.write('\n')  # 追加换行符，以便下次写入时数据格式清晰分隔
 

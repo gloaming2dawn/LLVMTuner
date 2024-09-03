@@ -166,8 +166,8 @@ def train_gp(train_x, train_y, cat_dims=[], use_ard=True, use_input_warping=Fals
                 model.input_transform.concentration0.data.clamp_(1e-5, 1e5)
                 model.input_transform.concentration1.data.clamp_(1e-5, 1e5)
     posterior = model.posterior(train_x)
-    y_pre = posterior.mean.view(-1).cpu().detach().numpy()
-    y_train = train_y.squeeze().cpu().detach().numpy()
+    # y_pre = posterior.mean.view(-1).cpu().detach().numpy()
+    # y_train = train_y.squeeze().cpu().detach().numpy()
     # residuals = y_pre - y_train
     # squared_residuals = residuals ** 2
     # rmse = np.sqrt(np.mean(squared_residuals))
@@ -189,27 +189,29 @@ def train_gp(train_x, train_y, cat_dims=[], use_ard=True, use_input_warping=Fals
     
     
     # find features not in training samples but in candidates and modify the coresponding lengthscale
-    tmp_x=train_x-train_x[0]
-    mask = tmp_x.sum(dim=0)==0
-    mask = mask.unsqueeze(0)
-    # print(torch.min(model.covar_module.base_kernel.lengthscale).detach())
-    # print(mask)
-    # print(model.covar_module.base_kernel.lengthscale)
-    # print(model.covar_module.base_kernel.lengthscale[mask])
-    # a=model.covar_module.base_kernel.lengthscale.data
-    # a[mask]=0.1
-    # print(a)
-    # model.covar_module.base_kernel.lengthscale.data=a
-    # print(model.covar_module.base_kernel.lengthscale)
+    # tmp_x=train_x-train_x[0]
+    # mask = tmp_x.sum(dim=0)==0
+    # mask = mask.unsqueeze(0)
+    # # print(torch.min(model.covar_module.base_kernel.lengthscale).detach())
+    # # print(mask)
+    # # print(model.covar_module.base_kernel.lengthscale)
+    # # print(model.covar_module.base_kernel.lengthscale[mask])
+    # # a=model.covar_module.base_kernel.lengthscale.data
+    # # a[mask]=0.1
+    # # print(a)
+    # # model.covar_module.base_kernel.lengthscale.data=a
+    # # print(model.covar_module.base_kernel.lengthscale)
     
     
-    lengthscale=model.covar_module.base_kernel.lengthscale
-    # lengthscale[mask] = torch.min(model.covar_module.base_kernel.lengthscale).data
-    lengthscale[mask] = 99
-    model.covar_module.base_kernel.lengthscale=lengthscale
+    # lengthscale=model.covar_module.base_kernel.lengthscale
+    # # lengthscale[mask] = torch.min(model.covar_module.base_kernel.lengthscale).data
+    # lengthscale[mask] = 99
+    # model.covar_module.base_kernel.lengthscale=lengthscale
 
     model.eval()
     likelihood.eval()
+
+    
     # print(model.covar_module.base_kernel.lengthscale)
     return model
 

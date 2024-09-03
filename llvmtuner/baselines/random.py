@@ -8,7 +8,6 @@ import llvmtuner
 from llvmtuner.searchspace import default_space, passlist2str, parse_O3string
 
 
-
 class random_optimizer:
     def __init__(self, fun, passes, budget, len_seq=100):
         self.fun = fun

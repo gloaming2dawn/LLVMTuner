@@ -54,10 +54,10 @@ features = {'dse':'NumRedundantStores NumFastStores NumFastOther NumCompletePart
             'sccp': 'NumInstRemoved NumInstReplaced NumArgsElimed NumGlobalConst',
             
             'bdce': 'NumRemoved NumSimplified NumSExt2ZExt',
-            
-            'simplifycfg':'NumSimpl',
-            
+                        
             'loop-instsimplify':'NumSimplified',
+
+            'instsimplify':'NumSimplified',
             
             'loop-load-elim':'NumLoopLoadEliminted',
             
@@ -266,11 +266,19 @@ def read_optstats_from_cfgjson(cfg_json):
         #         new_stats[fileroot+'.'+ key] = value
 
         if os.path.exists(stats_file):
-            with open(stats_file, 'r') as f:
-                stats=json.load(f)
-            for key, value in stats.items():
-                if key in pass_stats_keys:
-                    new_stats[fileroot+'.'+ key] = value
+            try:
+                with open(stats_file, 'r') as f:
+                    stats=json.load(f)
+                for key, value in stats.items():
+                    if key in pass_stats_keys:
+                        new_stats[fileroot+'.'+ key] = value
+            except:
+                assert 1==0, stats_file
+            # with open(stats_file, 'r') as f:
+            #     stats=json.load(f)
+            # for key, value in stats.items():
+            #     if key in pass_stats_keys:
+            #         new_stats[fileroot+'.'+ key] = value
 
         else:
             new_stats = None
