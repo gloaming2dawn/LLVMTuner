@@ -1,35 +1,35 @@
-# llvmtuner使用说明
+# LLVMTuner User Guide
 
 
 ## Installation
-以下安装流程在Ubuntu20下测试通过
+The following installation process has been tested on Ubuntu 20.
 
-### 1. 安装llvmtuner
-首先安装python环境
+### 1. Install LLVMTuner
+First, set up a Python environment:
 >conda create -n llvmtuner python=3.9.9
 >conda activate llvmtuner
 
-首先下载代码
+Download the source code:
 >git clone https://github.com/gloaming2dawn/LLVMTuner.git
 
-cd进入主目录，安装llvmtuner：
+Enter the project root directory and install LLVMTuner:
 ```
 pip install -r requirements.txt
 pip install -e .
 ```
-安装后将生成clangopt/clangxxopt命令行工具和可导入的llvmtuner库
+After installation, the command-line tools clangopt/clangxxopt and the importable Python module llvmtuner will be available.
 
-### 2. 安装LLVM 17.0.6及自定义pass _**FuncNames**_
-使用提供的自动脚本安装LLVM17.0.6，默认安装目录为~/llvm17.0.6
+### 2. Install LLVM 17.0.6 and the custom pass _**FuncNames**_
+Use the provided script to automatically install LLVM 17.0.6. The default installation path is ~/llvm17.0.6
 >./install_llvm.sh
 
-完成后将对应二进制路径添加至环境变量：
+Add the LLVM binaries to your PATH：
 >export PATH=~/llvm17.0.6/bin/:$PATH
 
-测试LLVM安装是否成功
+Test whether LLVM is installed
 >clang --version
 
-安装 _**FuncNames**_
+Install _**FuncNames**_
 ```
 export LLVM_DIR=~/llvm17.0.6
 cd FuncNames
@@ -39,16 +39,21 @@ cmake -DLT_LLVM_INSTALL_DIR=$LLVM_DIR ..
 make
 ```
 
-### 3. 下载FlameGraph
+### 3. Download FlameGraph
 ```
 git clone https://github.com/brendangregg/FlameGraph.git
 ```
 
-## 功能详细说明：如何对一个新程序进行调优
-### 1. 自动获取热点文件
-首先我们考虑真实程序往往有较多源文件，我们需要自动识别热点文件的功能。注意为自动获取热点文件，用户需在目标平台具有root权限（因为perf收集profile数据需要root权限），并提前设置无需输入密码即可使用sudo。可在目标平台通过"sudo visudo"来编辑 sudoers 文件，在文件末尾添加
-> username ALL=(ALL) NOPASSWD: ALL #修改username为对应用户名
+## Detailed Usage: How to Tune a New Program
+### 1. Automatically Detect Hot Files
+Real-world programs usually contain many source files. LLVMTuner can automatically detect hot files.
+Note: This requires root privileges on the target platform (perf requires root). You must also configure passwordless sudo via: 
+> sudo visudo
 
+Add the following to the end of the file (username should be replaced by your real username):
+> username ALL=(ALL) NOPASSWD: ALL
+
+Example:
 ```python
 import llvmtuner
 from llvmtuner.utils import gen_hotfiles
@@ -57,20 +62,21 @@ hotfiles, hotfiles_details = gen_hotfiles(build_cmd, build_dir, tmp_dir, run_cmd
 print(hotfiles,hotfiles_details)
 ```
 
-### 2. 将调优问题定义为黑盒函数
-自动得到热点文件后，用户可将phase-ordering问题定义为黑盒函数，并且在给黑盒函数确定热点文件后，该函数每次接受新的编译配置时，只会编译热点文件。
+### 2. Define the tuning problem as a black-box function
+After obtaining hot files, users can define the phase-ordering problem as a black-box function.  Once hot files are provided, the function will compile only these hot files under each new configuration. Since real tuning often requires cross-compilation (compile on x86, run on target platform), users should provide normal build/run commands and directories.
 
-考虑到真实调优场景要求我们使用交叉编译，即编译在多核高性能x86平台，而运行程序在目标平台（如嵌入式开发板），我们也添加了相应支持。
+The only requirement is to replace clang/clang++ with clangopt/clangxxopt in the build command, such as:
+> `make CC=clangopt`
 
-总的来说用户只需提供其正常编译和运行所需命令和对应执行路径，即可实现自动调优。唯一需要的工作是在提供build_cmd时显示地将编译器名称由clang/clang++替换为clangopt/clangxxopt，比如`make CC=clangopt`。
+LLVMtuner also support pass filtering to help analyze which passes matter.
 
-同时我们提供了pass自动筛选功能，以方便用户分析哪些编译选项（pass）对程序重要。
+Example:
 
 ```python
 import llvmtuner
 from llvmtuner import searchspace
 from llvmtuner.function_wrap import Function_wrap
-from llvmtuner.baselines.random import random_optimizer # 提供三种算法random,nevergrad及BO
+from llvmtuner.baselines.random import random_optimizer # random,nevergrad,BO
 from fabric import Connection
 
 passes = searchspace.default_space()[0]
@@ -110,26 +116,31 @@ fun.build(best_cfg) # 再次使用最优配置编译生成二进制
 # fun.reduce_pass(best_cfg) # 可选，使用reduce_pass来筛选出真正对性能有提升的pass
 ```
 
-## 快速测试
-### 1. CBench上测试：本机环境编译并运行程序
-下载和安装cBench_V1.1，我们已经提供好python脚本以自动下载和安装cBench，以下命令将cBench_V1.1安装在用户主目录下
+## Quick Testing
+### 1. Test on cBench (Local Compilation + Execution)
+Download and install cBench_V1.1. We have provided a Python script to automatically download and install cBench. The following command will install cBench_V1.1 in the user's home directory.
 ```
 cd example
 python download_cbenchdatasets.py
 ```
 
-执行以下命令赋予cBench执行权限
+Grant execution permissions to cBench
 >sudo chmod -R 777 ~/cBench_V1.1
 
-在example文件夹下，执行以下命令来使用我们的贝叶斯优化方法调优特定benchmark，对应结果将保存在~/local_result_llvmtuner/cBench/目录下
+In the example folder, execute the following command to use our Bayesian optimization method for tuning a specific benchmark. The corresponding results will be saved in the ~/local_result_llvmtuner/cBench/ directory.
 >python run_cBench.py --method=BO --budget=300 --benchmark=telecom_adpcm_c
 
-这里我们提供三种可选method：random, nevergrad, BO
-benchmark同样可以相应替换为security_sha, telecom_gsm等，更多可供调优的benchmark可参阅run_cBench.py文件。
+Here we provide three optional methods: `random, nevergrad, and BO`.
+The benchmark argument can also be replaced with `security_sha, telecom_gsm`, etc.
+More available benchmarks for tuning can be found in the run_cBench.py file.
 
 
-### 2. 在cBench上进行交叉编译测试
-真实调优场景要求我们使用交叉编译，即编译在多核高性能x86平台，而运行程序在目标平台（如嵌入式开发板）。我们提供了run_cBench_ssh.py在我们的环境下实现了交叉编译调优。用户应根据实际情况修改该文件，具体所需修改如下（即修改对应平台的交叉编译命令，运行文件夹，ssh连接等）：
+
+### 2. Cross-compilation testing on cBench
+In real tuning scenarios, cross-compilation is typically required—for example, compilation is performed on a multi-core high-performance x86 platform, while the program is executed on the target platform (such as an embedded development board).
+
+We provide `run_cBench_ssh.py`, which implements cross-compilation tuning in our environment.
+Users should modify this file according to their own setup. Specifically, the following parts need to be updated (cross-compilation command, run directory, SSH connection, etc.):
 
 ```python
 cross_flags='--target=aarch64-linux-gnu --sysroot=/home/jiayu/gcc-4.8.5-aarch64/install/aarch64-unknown-linux-gnu/sysroot/ --gcc-toolchain=/home/jiayu/gcc-4.8.5-aarch64/install' #用户应替换为对应平台下的交叉编译工具链
@@ -144,43 +155,59 @@ run_dir = '/home/nvidia/cBench_V1.1/{}/src_work/'.format(args.benchmark) #用户
 run_cmd = ben2cmd[args.benchmark]
 ```
 
-### 3. SPEC CPU 2017测试
-SPEC CPU 2017有版权限制，用户需自行购买并下载SPEC CPU 2017到主目录下，参考(https://www.spec.org/cpu2017/Docs/install-guide-unix.html)进行安装，并更新到最新版本。
+### 3. SPEC CPU 2017 Testing
+SPEC CPU 2017 is proprietary software. Users must purchase and download it themselves to their home directory, install it following the official guide (https://www.spec.org/cpu2017/Docs/install-guide-unix.html
+), and update it to the latest version.
 
-同时由于SPEC CPU 2017和常见benchmark不同，其提供了runcpu命令行工具而非编译脚本供用户使用。我们需要根据实际平台系统修改一个cfg文件置于config/目录下，这里我们在example文件夹中提供了my-clang-linux-x86.cfg配置文件支持LLVM编译器、linux系统、x86平台，方便用户本地测试。用户需复制到config/目录下。
+Unlike typical benchmarks, SPEC CPU 2017 provides the `runcpu` command-line tool instead of build scripts.
+A platform-specific cfg file must be prepared and placed in the `config/` directory.
+
+We provide an example configuration file `my-clang-linux-x86.cfg` (supporting LLVM, Linux, and x86), located in the example folder, for user's convenient local testing. Copy it into the config directory:
+
 >cp my-clang-linux-x86.cfg ~/cpu2017/config/
 
-我们同时提供了脚本来生成运行目录和运行脚本，见example文件夹下的gen_rundir_spec2017.py，执行以下命令将在主目录下生成spec2017_run目录，以519.lbm_r为例，其运行目录为~/spec2017_run/519.lbm_r/，运行脚本为run_519.lbm_r.sh。
+We also provide a script for generating run directories and run scripts: `gen_rundir_spec2017.py`.
+Running it will generate the `spec2017_run` directory under the home folder. 
 >python gen_rundir_spec2017.py
 
-用户可以运行以下命令在本机环境下自动调优SPEC CPU 2017：
+For example, for 519.lbm_r, the run directory will be ~/spec2017_run/519.lbm_r/, and the run script will be run_519.lbm_r.sh.
+
+You can run the following command to automatically tune SPEC CPU 2017 locally:
 >python run_SPEC.py --method=random --budget=10 --benchmark=519.lbm_r
 
-对于SPEC CPU 2017在交叉编译情形下的测试，用户需根据实际情况，编写对应cfg文件，我们提供了用于在x86平台交叉编译aarch64的配置文件为见my-clang-linux-cross_x862aarch64.cfg。用户还需将对应生成的spec2017_run目录传输到目标执行平台。
+For cross-compilation testing of SPEC CPU 2017, users must prepare an appropriate cfg file for their platform.
+We provide an example file for cross-compiling AArch64 on an x86 host: `my-clang-linux-cross_x862aarch64.cfg`.
+You must also transfer the generated spec2017_run directory to the target platform. 
 
 
-### 4. 实验结果
-性能测试平台：Jetson-TX2 (4核 Arm cortex-a57, 2.0GHz, 8G LPDDR4, Linux Kernel 4.4.15)
 
-交叉编译及算法运行平台：Intel Xeon Gold 5218R CPU
+### 4. Experimental Results
+Performance testing platform：Jetson-TX2 (4-core Arm cortex-a57, 2.0GHz, 8G LPDDR4, Linux Kernel 4.4.15)
 
-编译器：LLVM 17.0.6
+Cross-compilation and algorithm execution platform: Intel Xeon Gold 5218R CPU
 
-基准程序集：cBench及SPEC CPU 2017
+Compiler: LLVM 17.0.6
 
-对比方法：为了体现我们的搜索方法的效率，我们选择了随机搜索random、nevergrad框架默认搜索方法作为对比。对于cBench，这两种方法给定的搜索预算是1000次；而我们自己的搜索方法只给定500次的搜索预算。对于SPEC，由于其运行代价高昂，所有方法均只运行300次。
+Benchmark suites：cBench and SPEC CPU 2017
 
-cbench实验结果可见下图,我们的算法在仅使用了1/2的搜索预算的情况下仍然取得了超越其他算法的性能。
+Comparison methods：To demonstrate the efficiency of our search method, we compare against random search and the default search method in the Nevergrad framework. For cBench, both baselines are given a search budget of 1000 evaluations, whereas our method only uses 500 evaluations.
+For SPEC CPU 2017, due to its high runtime cost, all methods are limited to 300 evaluations.
+
+
+The cBench experimental results are shown below.
+Even with only half the search budget, our method still outperforms the baselines.
 
 ![cbench](./examples/cBench.svg "Magic Gardens")
 
-SPEC实验结果可见下图,我们的算法整体仍然取得最优结果
+The SPEC experimental results are shown below.
+Our method again achieves the best overall performance.
 
 ![spec](./examples/SPEC.svg "Magic Gardens")
 
-
-
-Pass分析：我们的搜索框架同时还提供了对搜索到的优化序列进行最小化的功能，用于分析到底哪些pass对程序的影响较大。我们统计了对于cbench不同pass出现在最优序列中的频率，频率超过10%的pass在下表中可见，观察到的趋势是大部分高频pass都与冗余指令削减相关，此外循环优化相关pass也占很大比例。
+Pass analysis：Our search framework also provides a reduction step that minimizes the discovered optimization sequence to identify which passes truly impact performance.
+We computed the frequency of each pass appearing in the optimal sequences across cBench.
+The passes whose frequency exceeds 10% are shown in the following figure.
+Most frequently appearing passes are related to redundant instruction elimination, with loop optimization passes also contributing significantly.
 
 ![cbench](./examples/pass_freq.png "Magic Gardens")
 
