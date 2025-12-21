@@ -172,8 +172,7 @@ Running it will generate the `spec2017_run` directory under the home folder.
 
 For example, for 519.lbm_r, the run directory will be ~/spec2017_run/519.lbm_r/, and the run script will be run_519.lbm_r.sh.
 
-You can run the following command to automatically tune SPEC CPU 2017 locally:
->python run_SPEC.py --method=random --budget=10 --benchmark=519.lbm_r
+Please check `run_spec_ssh_x862x86.py` to understand and create your own script to automatically tune SPEC CPU 2017 locally.
 
 For cross-compilation testing of SPEC CPU 2017, users must prepare an appropriate cfg file for their platform.
 We provide an example file for cross-compiling AArch64 on an x86 host: `my-clang-linux-cross_x862aarch64.cfg`.
