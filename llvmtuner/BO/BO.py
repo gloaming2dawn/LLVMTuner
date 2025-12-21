@@ -10,9 +10,10 @@ from copy import deepcopy
 import subprocess
 import random
 # from pathos.multiprocessing import Pool
-# import multiprocessing as mp
+import multiprocessing as mp
 # mp.set_start_method('spawn', force=True)
-from multiprocessing import Pool
+# mp.set_start_method('forkserver', force=True)
+# from multiprocessing import Pool
 # from torch.multiprocessing import Pool, Process, set_start_method
 # try:
 #      set_start_method('spawn')
@@ -52,33 +53,24 @@ import nevergrad as ng
 # from pymoo.core.evaluator import Evaluator
 # from pymoo.core.termination import NoTermination
 import llvmtuner
-from llvmtuner.searchspace import default_space, passlist2str
+from llvmtuner.searchspace import default_space, passlist2str, parse_O3string, split_by_parentheses
 from llvmtuner.feature_extraction import read_optstats_from_cfgjsonlist, stats2vec, read_optstats_from_cfgpath
 
 
-import psutil
-import cProfile
-import io
-import pstats
+# import psutil
+# import cProfile
+# import io
+# import pstats
 
 
-def get_pytorch_threads():
-    """ 获取当前 Python 进程由于 PyTorch 占用的线程信息 """
-    current_pid = os.getpid()
-    process = psutil.Process(current_pid)
-    
-    print(f"当前进程 PID: {current_pid}")
-    
-    try:
-        # 获取所有线程
-        threads = process.threads()
-        for thread in threads:
-            print(f"线程 ID: {thread.id}, 用户时间: {thread.user_time}, 系统时间: {thread.system_time}")
-    except psutil.AccessDenied:
-        print("无法访问进程的线程信息。")
-    except psutil.NoSuchProcess:
-        print("进程不存在。")
 
+def replace_fraction(seq, passes, fraction):
+    num_elements = len(seq)  
+    num_to_replace = max(1, int(num_elements * fraction))  
+    indices_to_replace = random.sample(range(num_elements), num_to_replace)
+    for index in indices_to_replace:
+        seq[index] = random.choice(passes)  
+    return seq
 
 
 
@@ -197,15 +189,15 @@ class BO:
         precompiled_path=None, # path that contains a large number of precompiled IR and their optimization configs
         n_parallel=50,
         n_init=20,
-        max_cand_seqs = 1000,
+        max_cand_seqs = 5000,
         batch_size=1,
-        acqf='UCB', # 'EI' or 'UCB'
+        acqf='EI', # 'EI' or 'UCB'
         beta=1.96, # only useful when acq=UCB, used to trade off exploration and exploitation
         failtol=50,
         # n_init_acq=512,
         # max_acq_size=128,
         # n_restarts_acq=1,
-        heristics = {"random":200,"NGOpt":0,"GA":0, "PSO":0,"DE":0},
+        heristics = {"random":50, "GA0.5":50, "GA0.25":50, "GA0.1":100},
         max_acq_size=256,
         verbose=True,
         use_ard=True,
@@ -356,6 +348,27 @@ class BO:
                 opt_str = passlist2str(seq)
                 if opt_str not in self.cands[fileroot]:
                     new_cands[fileroot].append(opt_str)
+            
+            for _ in range(self.heristics['GA0.5']):
+                seq = parse_O3string(deepcopy(self.best_params[fileroot]))
+                seq = replace_fraction(seq, self.passes, 0.5) 
+                opt_str = passlist2str(seq)
+                if opt_str not in self.cands[fileroot]:
+                    new_cands[fileroot].append(opt_str)
+
+            for _ in range(self.heristics['GA0.25']):
+                seq = parse_O3string(deepcopy(self.best_params[fileroot]))
+                seq = replace_fraction(seq, self.passes, 0.25) 
+                opt_str = passlist2str(seq)
+                if opt_str not in self.cands[fileroot]:
+                    new_cands[fileroot].append(opt_str)
+            
+            for _ in range(self.heristics['GA0.1']):
+                seq = parse_O3string(deepcopy(self.best_params[fileroot]))
+                seq = replace_fraction(seq, self.passes, 0.1) 
+                opt_str = passlist2str(seq)
+                if opt_str not in self.cands[fileroot]:
+                    new_cands[fileroot].append(opt_str)
         
         
         # for _ in range(self.heristics['DE']):
@@ -392,18 +405,27 @@ class BO:
             for fileroot in new_cands:
                 params[fileroot]=new_cands[fileroot][i]
             params_list.append(params)
- 
-
-
-        # import pickle
-        # pickle_bytes = pickle.dumps(self.budget)
-        # pickle_bytes = pickle.dumps(self.aaa)
-        # pickle_bytes = pickle.dumps(self.fun.gen_optIR)
         
-        with Pool() as p:
-            # p.map(self.fun.gen_optIR, params_list)
-            inputs = [(params, self.fun.tmp_dir, self.fun.hotfiles, self.fun.cmd, self.fun.cfg_dir, self.fun.build_dir, self.fun.profdata) for params in params_list]
-            p.map(self.fun.static_gen_optIR, inputs)
+        cfgfile = os.path.join(self.tmp_dir,'parallel_compilation_cfg.json')
+        with open(cfgfile, 'w') as file:
+            cfg = {}
+            cfg['tmp_dir'] = self.tmp_dir
+            cfg['hotfiles'] = self.fun.hotfiles
+            cfg['build_cmd'] = self.fun.build_cmd
+            cfg['cfg_dir'] = self.fun.cfg_dir
+            cfg['build_dir'] = self.fun.build_dir
+            cfg['profdata'] = self.fun.profdata
+            cfg['params_list'] = params_list
+            json.dump(cfg, file, indent=4)
+
+        # we run parallel compilation in a new subprocess to avoid cuda's influence
+        python_executable = sys.executable
+        subprocess.run(f'{python_executable} parallel_compilation.py --cfgfile={cfgfile}', shell=True, cwd=os.path.dirname(os.path.abspath(__file__)))
+
+        # with mp.Pool() as p:
+        #     # p.map(self.fun.gen_optIR, params_list)
+        #     inputs = [(params, self.fun.tmp_dir, self.fun.hotfiles, self.fun.cmd, self.fun.cfg_dir, self.fun.build_dir, self.fun.profdata) for params in params_list]
+        #     p.map(self.fun.static_gen_optIR, inputs)
         
         if self.verbose:
             print("Opt {} candidates cost {:.4f}".format(len(params_list), time()-t0))        
@@ -428,18 +450,18 @@ class BO:
         # else:
         #     device, dtype = self.device, self.dtype
         
-        # if (fX>0).all():
-        #     # self.pt=PowerTransformer(method='box-cox')
-        #     # self.pt.fit(fX)
-        #     # y=self.pt.transform(fX)
-        #     y=power_transform(fX,method='box-cox')
-        # else:
-        #     # self.pt=PowerTransformer(method='yeo-johnson')
-        #     # self.pt.fit(fX)
-        #     # y=self.pt.transform(fX)
-        #     y=power_transform(fX,method='yeo-johnson')
+        if (fX>0).all():
+            # self.pt=PowerTransformer(method='box-cox')
+            # self.pt.fit(fX)
+            # y=self.pt.transform(fX)
+            y=power_transform(fX,method='box-cox')
+        else:
+            # self.pt=PowerTransformer(method='yeo-johnson')
+            # self.pt.fit(fX)
+            # y=self.pt.transform(fX)
+            y=power_transform(fX,method='yeo-johnson')
         
-        y=(fX-fX.mean())/fX.std() #change
+        # y=(fX-fX.mean())/fX.std() #change
         
         X_torch = torch.tensor(X).to(device=device, dtype=dtype)
         y_torch = torch.tensor(y).to(device=device, dtype=dtype)
@@ -599,12 +621,19 @@ class BO:
     def feature_extraction(self):
         # extract features
         t0 = time()
-        self.cands, self.vecs_dict, self.feature_names = self.cands2vecs(self.cands)
-        self.seq2vec = {}
-        self.file2feature_names = {}
-        for fileroot in self.cands:
-            self.seq2vec[fileroot] = dict(zip(self.cands[fileroot],self.vecs_dict[fileroot]))
-            self.file2feature_names[fileroot] = [x for x in self.feature_names if x.startswith(fileroot)]
+        candsfile = os.path.join(self.tmp_dir, "cands.json")
+        with open(candsfile, 'w') as f:
+            json.dump(self.cands, f, indent=4)
+        python_executable = sys.executable
+        subprocess.run(f'{python_executable} parallelFE.py --candsfile={candsfile} --tmp_dir={self.tmp_dir}', shell=True, cwd=os.path.dirname(os.path.abspath(__file__)))
+        with open(os.path.join(self.tmp_dir, 'seq2vec.json'), 'r') as f:
+            self.feature_names, self.seq2vec = json.load(f)
+        # self.cands, self.vecs_dict, self.feature_names = self.cands2vecs(self.cands)
+        # self.seq2vec = {}
+        # self.file2feature_names = {}
+        # for fileroot in self.cands:
+        #     self.seq2vec[fileroot] = dict(zip(self.cands[fileroot],self.vecs_dict[fileroot]))
+        #     self.file2feature_names[fileroot] = [x for x in self.feature_names if x.startswith(fileroot)]
         if self.verbose:
             print("Feature_extraction cost {:.4f}".format(time()-t0))
         return self.seq2vec
@@ -685,17 +714,7 @@ class BO:
             if fX_next != inf:
                 self.tell(params, fX_next)
         
-        
-                
-            
-                
 
-            
-        
-        
-
-
-        
         # print('cost time:', time()-t0)
 
         # if self.precompiled_path is None:
@@ -719,16 +738,18 @@ class BO:
                         self.cands[fileroot].extend(new_cands[fileroot])
                     # re-extract features only when new_cands is not None
                     self.feature_extraction()
-                    t0 = time()
-                    # pr = cProfile.Profile()
-                    # pr.enable()
-                    subprocess.run('python parallel_compilation.py', shell=True, cwd=os.path.dirname(os.path.abspath(__file__)))
-                    # pr.disable()
-                    # s = io.StringIO()
-                    # ps = pstats.Stats(pr, stream=s).sort_stats('tottime')
-                    # ps.print_stats()
-                    # print(s.getvalue())
-                    print("ssssssss cost {:.4f}".format(time()-t0))
+                    # t0 = time()
+                    # # pr = cProfile.Profile()
+                    # # pr.enable()
+                    # with mp.Pool() as p:
+                    #     p.map(square, range(1000))
+                    # # subprocess.run('python parallel_compilation.py', shell=True, cwd=os.path.dirname(os.path.abspath(__file__)))
+                    # # pr.disable()
+                    # # s = io.StringIO()
+                    # # ps = pstats.Stats(pr, stream=s).sort_stats('tottime')
+                    # # ps.print_stats()
+                    # # print(s.getvalue())
+                    # print("ssssssss cost {:.4f}".format(time()-t0))
             
                 
 
@@ -763,16 +784,25 @@ class BO:
             #     params = permu_best_k(self.best_params, self.k, self.cands)
             #     if params not in self.params_list and params not in cand_params_list:
             #         cand_params_list.append(params)
-
+            file2slice = {}
+            current_ind = 0
             for fileroot in self.cands:#
                 n_cands=len(self.cands[fileroot])
                 if q > n_cands:
                     q = n_cands
-                seqs = random.sample(self.cands[fileroot], k=q)
+                if new_cands is not None:
+                    seqs = new_cands[fileroot] + random.sample(self.cands[fileroot], k=q)
+                else:
+                    seqs = random.sample(self.cands[fileroot], k=q)
+                # seqs = random.sample(self.cands[fileroot], k=q)
+                N_cand = 0
                 for seq in seqs:
                     params = permu_best(self.best_params, fileroot, seq)
-                    if params not in self.params_list:
+                    if params not in self.params_list and params not in cand_params_list:
                         cand_params_list.append(params)
+                        N_cand += 1
+                file2slice[fileroot] = slice(current_ind, current_ind + N_cand)
+                current_ind += N_cand
             
 
             # print('permu_best cost:',time()-t0)
@@ -812,21 +842,50 @@ class BO:
 
             # terminate_all_children()
             
-            # if there are candidates with unexplored features, we explore them
-            X_mean = np.mean(np.array(self.X), axis=0)
-            inds=[]
-            unexplored_feature_names=[]
-            for i in range(len(X_mean)):
-                if X_mean[i]==0:
-                    inds.append(i)
-                    unexplored_feature_names.append(self.feature_names[i])
-                    # print(self.feature_names[i])     
+            # # if there are candidates with unexplored features, we explore them
+            # X_mean = np.mean(np.array(self.X), axis=0)
+            # inds=[]
+            # unexplored_feature_names=[]
+            # for i in range(len(X_mean)):
+            #     if X_mean[i]==0:
+            #         inds.append(i)
+            #         unexplored_feature_names.append(self.feature_names[i])
+            #         # print(self.feature_names[i])     
+            # # print(unexplored_feature_names)
+            # print('Num of unexplored features:',len(unexplored_feature_names))
+            # mask = find_anynonzero_rows(np.array(cand_X), inds) #later
+
+            inds = find_allzero_columns(np.array(self.X))
+            print('Num of unexplored features:',len(inds))
+            mask1 = find_anynonzero_rows(np.array(cand_X), inds)
+            unexplored_feature_names = [self.feature_names[i] for i in inds]
             # print(unexplored_feature_names)
-            print('Num of unexplored features:',len(unexplored_feature_names))
-            mask = find_anynonzero_rows(np.array(cand_X), inds) #later
-            # acq_values[mask] = acq_values[mask] + 1000
-            if np.random.rand() > 0.3:
-                acq_values[mask] = acq_values[mask] + 10000
+
+            # inds = find_allpositive_columns(np.array(self.X))
+            # mask2 = find_anyzero_rows(np.array(cand_X), inds)
+            # print('Num of unexplored zero features:',len(inds))
+            # mask = np.logical_or(mask1, mask2)
+
+            mask = mask1
+            if np.random.rand() > 0.2:
+                acq_values[mask] = acq_values[mask] + 100000000 # prioritize selecting points with unexplored features 
+                extra_values = np.zeros(len(acq_values))
+                hot_order = len(self.fun.hotfiles)
+                for fileroot in self.fun.hotfiles: #ordered hot filenames
+                    extra_values[file2slice[fileroot]] = 100 *hot_order
+                    hot_order = hot_order -1
+                acq_values = acq_values + extra_values # secondly, from those points with unexplored features, prioritize hot files 
+                
+
+                # if random.random() > 0.2:
+                #     for unexplored_feature in unexplored_feature_names:
+                #         acq_values = acq_values + 10000
+                #     self.fun.hotfiles
+                #     acq_values = acq_values + 10000
+                
+                
+            
+            
             
             
             # select one sample from all candidates and evaluate them

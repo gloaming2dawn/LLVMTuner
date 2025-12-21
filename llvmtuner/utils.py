@@ -30,7 +30,7 @@ def reset_directory(directory, original_contents):
             shutil.rmtree(file_or_dir)
     missing_files = original_contents - current_contents
     for missing_file in missing_files:
-        source_file_or_dir = os.path.join(original_directory, missing_file)
+        source_file_or_dir = os.path.join(directory, missing_file)
         if os.path.isfile(source_file_or_dir):
             shutil.copy(source_file_or_dir, directory)
         elif os.path.isdir(source_file_or_dir):
@@ -59,7 +59,7 @@ def reset_directory_ssh(connection, directory, original_contents):
 
 class run_and_eval:
     def __init__(self, run_cmd, run_dir, binary, timeout=1000):
-        self.run_cmd = f'time timeout {timeout} ' + run_cmd
+        self.run_cmd = f'time (timeout {timeout} {run_cmd})'
         self.run_dir = run_dir
         self.binary = binary
 
@@ -88,7 +88,7 @@ class run_and_eval:
 
 class run_and_eval_ssh:
     def __init__(self, run_cmd, run_dir, binary, ssh_connection, timeout=1000):
-        self.run_cmd = f'time timeout {timeout} ' + run_cmd
+        self.run_cmd = f'time (timeout {timeout} {run_cmd})'#
         self.run_dir = run_dir
         self.binary = binary
         self.ssh_connection = ssh_connection
@@ -133,7 +133,7 @@ class run_and_eval_ssh:
         return runtime
 
 def cxxfilt(name):
-    cmd = f'c++filt -p {name}'
+    cmd = f'c++filt {name}'
     ret = subprocess.run(cmd, shell=True, capture_output=True, text=True)
     assert ret.returncode == 0, cmd
     return ret.stdout.strip()
@@ -146,6 +146,7 @@ def get_func_names(IR_path):
     ret = subprocess.run(cmd, shell=True, capture_output=True, text=True, timeout=20)
     assert ret.returncode == 0, cmd
     func_names = ret.stderr.strip().split('\n')
+    # print(func_names)
     func_names = [cxxfilt(x) for x in func_names if x !=''] #过滤掉空字符串
     return func_names
 
@@ -154,7 +155,8 @@ def get_func_names(IR_path):
 
 if __name__ == "__main__":
     # func_names = get_func_names('/home/jiayu/cBench_V1.1/security_sha/src_work/sha.bc')
-    func_names = get_func_names('/home/jiayu/result_llvmtuner_17/SPEC/541.leela_r/perf/FastState/IR-21e35be40cf52e85e56de4dfc5680c6a/FastState.opt.bc')
+    # func_names = get_func_names('/home/jiayu/result_llvmtuner_17_x86/SPEC/523.xalancbmk_r/gprof/PSVIAttributeList/IR-21e35be40cf52e85e56de4dfc5680c6a/PSVIAttributeList.opt.bc')
+    func_names = get_func_names('/home/jiayu/result_llvmtuner_17_x86/SPEC/523.xalancbmk_r/gprof/PSVIAttributeList/IR-29ea462ad8abc5db6ac6b900fcb53aeb/PSVIAttributeList.opt.bc')
     print(func_names)
 
 

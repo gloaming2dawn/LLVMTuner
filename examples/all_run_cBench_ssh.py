@@ -35,7 +35,7 @@ if args.device == '3':
     # bens=['bzip2e', 'consumer_jpeg_c', 'consumer_jpeg_d']
     bens = ['bzip2d', 'bzip2e', 'consumer_jpeg_c', 'consumer_jpeg_d', 'consumer_lame']
     server = 'cuda' 
-    cuda_number = 1
+    cuda_number = 0
 
 # if args.device == '3':
 #     bens=['consumer_lame', 'consumer_tiffmedian','network_dijkstra','network_patricia']
@@ -44,13 +44,17 @@ if args.device == '3':
 if args.device == '4':
     # bens=['consumer_lame','consumer_tiff2bw','consumer_tiffdither']#'consumer_tiff2bw',
     bens=['consumer_tiff2bw', 'consumer_tiff2rgba', 'consumer_tiffdither', 'consumer_tiffmedian', 'network_patricia']
+    bens=['consumer_tiff2rgba']
+    server = 'cuda' 
     server = 'cuda' 
     cuda_number = 0
 
 if args.device == '5':
     # bens=['consumer_tiff2rgba', 'security_blowfish_d']
     bens=['office_stringsearch1', 'security_blowfish_d', 'security_blowfish_e', 'security_rijndael_d', 'security_rijndael_e']
-    server='cpu'
+    # bens=['security_rijndael_d', 'security_rijndael_e']
+    server='cuda'
+    cuda_number = 1
 
 if args.device == '6':
     # bens=['telecom_gsm', 'security_blowfish_e'] #,'security_sha'
@@ -61,25 +65,27 @@ if args.device == '6':
 
 t1=time.time()
 # methods = ['random','one-for-all-random','O3']
-methods = ['random-single']
+# methods = ['random-first']
+# methods = ['BO','random','nevergrad']
+methods = ['random','nevergrad','BO']
 # methods = ['cost_model']
 # methods = ['cost_model', 'collect_pmu']
-# methods = ['O3']
+methods = ['O3']
 # methods = ['adaptive_local','one-for-all-nevergrad','random-len100']
 # methods = ['one-by-one','nevergrad','opentuner']
 
-epochs=1
+epochs=3
 for i in range(epochs):
     for method in methods:
-        if method == 'one-by-one':
-            budget = 3000
-        elif method == 'adaptive_local' or method == 'random-len100':
-            budget = 2000
+        if method == 'random':
+            budget = 1000
         else:
-            budget = 2000
+            budget = 1000
 
         t0=time.time()
         for benchmark in bens:
+            if benchmark in singlemodule_benchmarks and method == 'random' and i<1:
+                continue
             print('='*20)
             print(benchmark, method, i)
             if server=='cuda':

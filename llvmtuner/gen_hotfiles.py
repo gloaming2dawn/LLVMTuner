@@ -5,9 +5,111 @@ import os
 import hashlib
 import json
 import shutil
+import re
 from multiprocessing import Pool
 import llvmtuner
 from llvmtuner.function_wrap import Function_wrap
+
+
+def obtain_commands_in_sh(file_path):
+    with open(file_path, 'r') as file:
+        lines = file.readlines()
+    commands = []
+    command_count = 0
+    for line in lines:
+        stripped_line = line.strip()
+        if stripped_line and not stripped_line.startswith('#'):
+            command_count += 1
+            commands.append(stripped_line)
+    return commands
+
+
+
+def gprof_record(binary, run_dir):
+    local_dir, binary_name = os.path.split(binary)
+    cmd = f"gprof {binary_name} gmon.out > gprof.txt"
+    ret = subprocess.run(cmd, shell=True, cwd = run_dir, timeout=60)
+    assert ret.returncode == 0, cmd
+    return os.path.join(run_dir, 'gprof.txt')
+
+def gprof_record_ssh(ssh_connection, binary, run_dir):
+    local_dir, binary_name = os.path.split(binary)
+    try:
+        with ssh_connection.cd(run_dir):
+            cmd = f"sudo cgexec -g cpuset:mygroup gprof {binary_name} gmon.out > gprof.txt"
+            ssh_connection.run(cmd, timeout=100)
+    except Exception as e:
+        assert 1==0
+
+    try:
+        ret = ssh_connection.get(os.path.join(run_dir,'gprof.txt'), local=local_dir+'/')
+    except Exception as e:
+        assert 1==0, f'remote get failed: from {run_dir} to {local_dir}'
+    return os.path.join(local_dir, 'gprof.txt')
+    
+def parse_gprof_report(file_path):
+    # 用于存储函数及其对应时间占比的字典
+    function_times = {}
+
+    # 定义正则表达式模式，用于匹配时间占比和函数名称
+    pattern = re.compile(r'^ *(\d+\.\d+) +\d+\.\d+ +\d+\.\d+ +(.+?)\s*$')
+
+    # 读取 gprof 报告文件
+    with open(file_path, 'r') as file:
+        for line in file:
+            match = pattern.match(line)
+            if match:
+                percentage = float(match.group(1))
+                function_name = match.group(2).strip()
+                # function_name = function_name.split('(')[0]
+                function_times[function_name] = percentage
+
+    return function_times
+
+def find_elements_for_percent(data, threshold=0.95, min_percent=0.03):
+    # 计算总和
+    total = sum(data.values())
+
+    # 计算每个元素的百分比，并按照百分比由大到小排序
+    sorted_data = sorted(data.items(), key=lambda x: x[1], reverse=True)
+    percentages = []
+    for item in sorted_data:
+        percentages.append(list([item[0], item[1] / total]))
+
+    # 计算累积百分比，找出累积达到95%的元素
+    cumulative_percentage = 0
+    elements_filtered = []
+    x_filtered = []
+
+    for item in percentages:
+        if cumulative_percentage >= threshold or item[1] < min_percent:
+            break
+        cumulative_percentage += item[1]
+        item.append(cumulative_percentage)
+        elements_filtered.append(item)#
+        x_filtered.append(item[0])
+    return x_filtered, elements_filtered
+
+def hotfunctions2hotfiles(module2funcnames, function_times, threshold=0.95, min_percent=0.025):
+    module2cost = {}
+    for module in module2funcnames:
+        for func in function_times:
+            if func in module2funcnames[module]:
+                if module not in module2cost:
+                    module2cost[module] = function_times[func]
+                else:
+                    module2cost[module] += function_times[func]
+    hotfiles, elements_filtered = find_elements_for_percent(module2cost, threshold)
+    for item in elements_filtered:
+        print(f"{item[0]}: {item[1]*100:.2f}%, {item[2]*100:.2f}%")
+    sorted_module2cost = dict(sorted(module2cost.items(), key=lambda item: item[1], reverse=True))
+    return hotfiles, elements_filtered, sorted_module2cost
+
+def gen_hotfiles_gprof(fun):
+    '''
+    fun: Function_wrap object
+    '''
+    pass
 
 def perf_record(binary, run_dir, run_cmd):
     #如果编译后的binary不在运行目录，复制文件到运行目录
@@ -85,29 +187,9 @@ def perf_record_ssh(ssh_connection, binary, run_dir, run_cmd):
     
     return os.path.join(local_dir, 'out.folded')
 
-def find_elements_for_percent(data, threshold=0.95):
-    # 计算总和
-    total = sum(data.values())
 
-    # 计算每个元素的百分比，并按照百分比由大到小排序
-    sorted_data = sorted(data.items(), key=lambda x: x[1], reverse=True)
-    percentages = []
-    for item in sorted_data:
-        percentages.append(list([item[0], item[1] / total]))
 
-    # 计算累积百分比，找出累积达到95%的元素
-    cumulative_percentage = 0
-    elements_filtered = []
-    x_filtered = []
 
-    for item in percentages:
-        if cumulative_percentage >= threshold or item[1] < 0.03:
-            break
-        cumulative_percentage += item[1]
-        item.append(cumulative_percentage)
-        elements_filtered.append(item)#
-        x_filtered.append(item[0])
-    return x_filtered,elements_filtered
 
 def perfdata2hotfiles(module2funcnames, binary_name, folded_perf_result):
     module2cost = {}

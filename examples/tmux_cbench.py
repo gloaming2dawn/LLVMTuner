@@ -3,13 +3,15 @@ import time
 
 # 定义要执行的 Python 程序和对应的 tmux 会话名称
 python_programs = {
-    '3': 'python all_run_cBench_ssh.py --device=3',
     '2': 'python all_run_cBench_ssh.py --device=2',
+    '3': 'python all_run_cBench_ssh.py --device=3',
     '5': 'python all_run_cBench_ssh.py --device=5',
     '6': 'python all_run_cBench_ssh.py --device=6',
-    '4': 'python all_run_cBench_ssh.py --device=4',
+    # '4': 'python all_run_cBench_ssh.py --device=4',
     # 添加更多的会话和对应的 Python 程序
 }
+
+# subprocess.run('tmux kill-server',shell=True)
 
 # 遍历字典，为每个会话创建一个新的 tmux 会话并执行对应的 Python 程序
 for session_name, program_name in python_programs.items():

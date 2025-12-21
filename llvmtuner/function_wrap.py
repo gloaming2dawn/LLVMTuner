@@ -4,6 +4,7 @@ import subprocess
 import json
 import hashlib
 from math import inf
+import re
 import numpy as np
 from scipy import stats
 import time
@@ -20,7 +21,7 @@ from llvmtuner.show_features import dict_changes
 
 
 class Function_wrap:
-    def __init__(self, build_cmd, build_dir, tmp_dir, run_cmd, run_dir, hotfiles=None, binary=None, ssh_connection=None, run_and_eval_fun=None, timeout=1000, is_genprofdata=False, profdata=None, repeat = 1, max_n_measure = 5, adaptive_measure = True):
+    def __init__(self, build_cmd, build_dir, tmp_dir, run_cmd, run_dir, hotfiles=None, binary=None, ssh_connection=None, run_and_eval_fun=None, timeout=1000, is_genprofdata=False, profdata=None, repeat = 1, max_n_measure = 5, adaptive_measure = True, wrong_exetime= 0.05):
         '''
         Parameters
         ----------
@@ -35,7 +36,7 @@ class Function_wrap:
         binary : string, optional
             exe binary after compilation, e.g. /home/usr/testbench/a.out.
         '''
-        self.cmd = build_cmd
+        self.build_cmd = build_cmd
         self.hotfiles = hotfiles
         self.binary = binary
         self.build_dir =build_dir
@@ -72,8 +73,13 @@ class Function_wrap:
         self.md5sums=[]
         self.best_y=inf
         self.result_file = os.path.join(self.tmp_dir, 'result.json')
+        self.wrong_exetime = wrong_exetime
         # module2funcnames= self._get_func_names()
         # print(module2funcnames)
+
+        hotobjsrecord = os.path.join(self.tmp_dir, 'hot_objs.json')
+        if os.path.isfile(hotobjsrecord):
+            os.remove(hotobjsrecord)
 
 
     def _get_func_names(self):
@@ -82,6 +88,7 @@ class Function_wrap:
         flag = self.build(opt_str)
         assert flag
         print(f'time of generating IRs:',time.time()-t0)
+        
         module2funcnames = {}
         fileroot_list = []
         IR_list = []
@@ -101,6 +108,30 @@ class Function_wrap:
             funcnames_list = p.map(get_func_names, IR_list)
 
         module2funcnames = dict(zip(fileroot_list, funcnames_list))
+
+        #以下用于处理头文件中含有函数定义，导致多个IR/obj文件中有相同函数名的情况
+        with open(os.path.join(self.tmp_dir, 'link_cmd.json'),'r') as ff:
+            link_cmd = json.load(ff)
+        objs = re.findall(r'\b(\S+\.o)\b', link_cmd)
+        # 记录已经出现的函数名
+        seen_funcs = set()
+        # 存储最终的 module2funcnames
+        new_module2funcnames = {}
+        # 遍历 objs 列表，按照顺序处理模块
+        for obj in objs:
+            fileroot = os.path.splitext(obj)[0]
+            fileroot = fileroot.replace('/','_')
+            if fileroot in module2funcnames:
+                # 获取当前模块的函数名集合
+                current_funcnames = module2funcnames[fileroot]
+                # 过滤掉已经出现的函数名
+                filtered_funcnames = {fn for fn in current_funcnames if fn not in seen_funcs}
+                # 更新已出现的函数名集合
+                seen_funcs.update(filtered_funcnames)
+                # 更新新的 module2funcnames
+                new_module2funcnames[fileroot] = filtered_funcnames
+        module2funcnames = new_module2funcnames
+
         return module2funcnames
 
 
@@ -143,15 +174,15 @@ class Function_wrap:
         with open(cfgpath, 'w') as f:
             json.dump(cfg, f, indent=4)
         
-        assert 'clangopt' in self.cmd or 'clangxxopt' in self.cmd
-        build_cmd = self.cmd
+        assert 'clangopt' in self.build_cmd or 'clangxxopt' in self.build_cmd
+        build_cmd = self.build_cmd
 
-        if '"clangopt"' in build_cmd or "'clangopt'" in build_cmd:
+        if '"clangopt' in build_cmd or "'clangopt" in build_cmd or build_cmd.startswith('clangopt'):
             build_cmd = build_cmd.replace('clangopt', 'clangopt --gen-ir --opt-cfg-json={} --profdata={}'.format(cfgpath, self.profdata))
         else:
             build_cmd = build_cmd.replace('clangopt', '"clangopt --gen-ir --opt-cfg-json={} --profdata={}"'.format(cfgpath, self.profdata))
         
-        if '"clangxxopt"' in build_cmd or "'clangxxopt'" in build_cmd:
+        if '"clangxxopt' in build_cmd or "'clangxxopt" in build_cmd or build_cmd.startswith('clangxxopt'):
             build_cmd = build_cmd.replace('clangxxopt', 'clangxxopt --gen-ir --opt-cfg-json={} --profdata={}'.format(cfgpath, self.profdata))
         else:
             build_cmd = build_cmd.replace('clangxxopt', '"clangxxopt --gen-ir --opt-cfg-json={} --profdata={}"'.format(cfgpath, self.profdata))
@@ -177,12 +208,12 @@ class Function_wrap:
         assert 'clangopt' in cmd or 'clangxxopt' in cmd
         build_cmd = cmd
 
-        if '"clangopt"' in build_cmd or "'clangopt'" in build_cmd:
+        if '"clangopt' in build_cmd or "'clangopt" in build_cmd or build_cmd.startswith('clangopt'):
             build_cmd = build_cmd.replace('clangopt', 'clangopt --gen-ir --opt-cfg-json={} --profdata={}'.format(cfgpath, profdata))
         else:
             build_cmd = build_cmd.replace('clangopt', '"clangopt --gen-ir --opt-cfg-json={} --profdata={}"'.format(cfgpath, profdata))
         
-        if '"clangxxopt"' in build_cmd or "'clangxxopt'" in build_cmd:
+        if '"clangxxopt' in build_cmd or "'clangxxopt" in build_cmd or build_cmd.startswith('clangxxopt'):
             build_cmd = build_cmd.replace('clangxxopt', 'clangxxopt --gen-ir --opt-cfg-json={} --profdata={}'.format(cfgpath, profdata))
         else:
             build_cmd = build_cmd.replace('clangxxopt', '"clangxxopt --gen-ir --opt-cfg-json={} --profdata={}"'.format(cfgpath, profdata))
@@ -205,9 +236,9 @@ class Function_wrap:
         with open(cfgpath, 'w') as f:
             json.dump(cfg, f, indent=4)
         
-        assert 'clangopt' in self.cmd or 'clangxxopt' in self.cmd
-        build_cmd = self.cmd
-        if '"clangopt"' in build_cmd or "'clangopt'" in build_cmd or build_cmd.startswith('clangopt'):
+        assert 'clangopt' in self.build_cmd or 'clangxxopt' in self.build_cmd
+        build_cmd = self.build_cmd
+        if '"clangopt' in build_cmd or "'clangopt" in build_cmd or build_cmd.startswith('clangopt'):
             if self.is_genprofdata:
                 build_cmd = build_cmd.replace('clangopt', f'clangopt --opt-cfg-json={cfgpath} --profdata={self.profdata} --instrument-ir')
             else:
@@ -219,7 +250,7 @@ class Function_wrap:
                 build_cmd = build_cmd.replace('clangopt', f'"clangopt --opt-cfg-json={cfgpath} --profdata={self.profdata}"')
 
         
-        if '"clangxxopt"' in build_cmd or "'clangxxopt'" in build_cmd or build_cmd.startswith('clangxxopt'):
+        if '"clangxxopt' in build_cmd or "'clangxxopt" in build_cmd or build_cmd.startswith('clangxxopt'):
             if self.is_genprofdata:
                 build_cmd = build_cmd.replace('clangxxopt', f'clangxxopt --opt-cfg-json={cfgpath} --profdata={self.profdata} --instrument-ir')
             else:
@@ -234,6 +265,13 @@ class Function_wrap:
         if ret.returncode != 0:
             print('cmd failed:', build_cmd)
             return False
+        #删除热点目标文件，以保证下次能重新编译
+        with open(os.path.join(self.tmp_dir, 'hot_objs.json'),'r') as ff:
+            for line in ff:
+                obj_path = line.strip()
+                if os.path.isfile(obj_path):
+                    os.remove(obj_path)
+        os.remove(os.path.join(self.tmp_dir, 'hot_objs.json'))
         return True
     
     def reduce_pass(self, params0):
@@ -278,6 +316,7 @@ class Function_wrap:
             seq0=[x for x in seq if x !='']
             params[fileroot] = passlist2str(seq0)
             if change==True:
+                print('====================================')
                 print(f'restart reducing {fileroot}')
                 params, y_ref=reduce_pass_single(params, fileroot)
             return params, y_ref
@@ -293,7 +332,7 @@ class Function_wrap:
         y=self.run_and_eval()
         if y == inf: 
             return inf
-        if y < 0.05: # y<0.03 means executation failed
+        if y < self.wrong_exetime: # y<wrong_exetime means executation failed
             return inf
         else:
             y_list.append(y)
@@ -330,7 +369,7 @@ class Function_wrap:
 
 
         flag = self.build(params)
-        # print(f'time of building:',time.time()-t0)
+        print(f'time of building:',time.time()-t0)
         cfg_path = os.path.join(self.cfg_dir, 'cfg-{}.json'.format( hashlib.md5(str(params).encode('utf-8')).hexdigest()) )
 
         if self.is_genprofdata:
@@ -359,7 +398,7 @@ class Function_wrap:
             if md5sum not in self.md5sums:
                 t0 = time.time()
                 y = self.measure()
-                # print(f'time of measuring:',time.time()-t0)
+                print(f'time of measuring:',time.time()-t0, y)
                 t0 = time.time()
                 if y!=inf and y != -inf:
                     self.params_list.append(deepcopy(params))

@@ -27,7 +27,8 @@ parser.add_argument('--gen-ir', default=False, action='store_true',
                     help='whether to only generate IR or to finish the whole compilation command')
 parser.add_argument('--instrument-ir', default=False, action='store_true', 
                     help='whether to instrument in IR level for generating profdata')
-parser.add_argument('--profdata', help='')
+parser.add_argument('--profdata', default='None', help='')
+# parser.add_argument('--record_hot_objs', type=bool, default=True, help='')
 parser.add_argument('--optlevel', default='-O3', help='')
 parser.add_argument('--llvm-dir', default='', help='')
 # parser.add_argument('--hotfiles', help='')
@@ -53,7 +54,7 @@ class Clangopt:
         初始化功能：（1）使用clang的-MJ命令生成compilation database；（2）从compilation database中获取编译信息
         '''
         if not args.opt_cfg_json:
-            self.params='default<O3>'
+            self.params=f'default<{args.optlevel[1:]}>'
             self.tmp_dir=os.path.join(os.path.expanduser('~/'), './tmp/')
             self.hotfiles=None
         else:
@@ -66,10 +67,12 @@ class Clangopt:
             self.tmp_dir=cfg['tmp_dir']
             self.hotfiles=cfg['hotfiles'] if 'hotfiles' in cfg else None
         os.makedirs(self.tmp_dir,exist_ok=True) 
+
+        self.compiler='clang++'
         
         # 使用clang的-MJ命令生成compilation database
-        # maybe we could also use clang++ -###
-        clang_cmd=['clang++']+unknown
+        # maybe we could also use clang -###
+        clang_cmd=[self.compiler]+unknown
         self.clang_cmd = clang_cmd
         print(' '.join(self.clang_cmd))
         
@@ -85,7 +88,7 @@ class Clangopt:
         if '-c' in clang_cmd or '-S' in clang_cmd:
             self.link=False
         else:
-            #意味着该命令形式为 clang++ *.c 或者 clang++ *.o
+            #意味着该命令形式为 clang *.c 或者 clang *.o
             self.link=True
         
         # 从compilation database中获取编译信息
@@ -105,11 +108,13 @@ class Clangopt:
     
     def _single_compile(self, x):
         source=x['file']
-        reldir,filename=os.path.split(source)
-        fileroot,fileext=os.path.splitext(filename)
+        # reldir,filename=os.path.split(source)
+        # fileroot,fileext=os.path.splitext(filename)
+        fileroot,fileext=os.path.splitext(source)
+        fileroot = fileroot.replace('/','_')
         
         if self.hotfiles and fileroot not in self.hotfiles: 
-            opt_str = args.optlevel
+            opt_str = f'default<{args.optlevel[1:]}>'
         else:
             if isinstance(self.params, (str)):
                 opt_str=self.params
@@ -190,7 +195,9 @@ class Clangopt:
                 link_cmd = ' '.join(self.clang_cmd) + ' -fprofile-generate'
             else:
                 link_cmd = ' '.join(self.clang_cmd)
-            print(link_cmd)
+            # print(link_cmd)
+            with open(os.path.join(self.tmp_dir, 'link_cmd.json'),'w') as ff:
+                json.dump(link_cmd, ff, indent=4)
 
             if not args.gen_ir:#如果是正常build
                 ret = subprocess.run(link_cmd, cwd =os.getcwd(), shell=True, capture_output=True)
@@ -220,19 +227,45 @@ class Clangopt:
         else:
             if self.hotfiles: 
                 for x in self.cdb:
-                    reldir,filename = os.path.split(x['file'])
-                    fileroot,fileext=os.path.splitext(filename)
+                    # reldir,filename = os.path.split(x['file'])
+                    # fileroot,fileext=os.path.splitext(filename)
+                    fileroot,fileext=os.path.splitext(x['file'])
+                    fileroot = fileroot.replace('/','_')
                     if fileroot in self.hotfiles:
                         flag = self._single_compile(x)
                         if not flag:
                             final_flag=False
+                        # 记录目标文件，在function_wrap中的所有编译完成后对其删除以保证下次仍然会重新编译
+                        if not args.gen_ir:
+                            obj_abspath = os.path.join(x['directory'], x['output'])
+                            with open(os.path.join(self.tmp_dir, 'hot_objs.json'),'a') as ff:
+                                ff.write(f"{obj_abspath}\n")
+                        # # 将目标文件时间戳提前，以保证下次仍然会重新编译
+                        # obj=os.path.join(x['directory'], x['output'])
+                        # stat_info = os.stat(obj)
+                        # current_mtime = stat_info.st_mtime 
+                        # current_atime = stat_info.st_atime  
+                        # os.utime(obj, (current_atime - 1, current_mtime - 1))
                         # 改变源文件时间戳保证下次仍然会重新编译
                         Path(x['file']).touch()
+                    else:
+                        obj_abspath = os.path.join(x['directory'], x['output'])
+                        if not os.path.exists(obj_abspath):
+                            flag = self._single_compile(x)
+                            if not flag:
+                                final_flag=False
+
+                        
             else:
                 for x in self.cdb:
                     flag = self._single_compile(x)
                     if not flag:
                         final_flag=False
+                    # 记录目标文件，在function_wrap中的所有编译完成后对其删除以保证下次仍然会重新编译
+                    if not args.gen_ir:
+                        obj_abspath = os.path.join(x['directory'], x['output'])
+                        with open(os.path.join(self.tmp_dir, 'hot_objs.json'),'a') as ff:
+                            ff.write(f"{obj_abspath}\n")
                     # 改变源文件时间戳保证下次仍然会重新编译
                     Path(x['file']).touch()
             
@@ -256,6 +289,8 @@ class Clangopt:
                     link_cmd = f'{link_cmd_wo_objs} {objs_str}'
                 ret = subprocess.run(link_cmd, shell=True, capture_output=True)
                 assert ret.returncode == 0, link_cmd
+                with open(os.path.join(self.tmp_dir, 'link_cmd.json'),'w') as ff:
+                    json.dump(link_cmd, ff, indent=4)
                 
     
 
@@ -267,26 +302,26 @@ class Clangopt:
         '''
         try:
             ret=subprocess.run(cmd, cwd=cwd, capture_output=True,shell=True,timeout=timeout)
-            assert ret.returncode == 0, [cmd,cwd]
+            # assert ret.returncode == 0, [cmd,cwd]
             if ret.returncode == 0:
                 flag=True
             else:
                 flag=False
-        except subprocess.TimeoutExpired:
+        except:
             flag=False
             ret=None
         return flag, ret
     
     
-    @classmethod
-    def source2IR(cls, llvm_dir, source, cflags, optlevel, output, cwd=None):
+    # @classmethod
+    def source2IR(self, llvm_dir, source, cflags, optlevel, output, cwd=None):
         if args.instrument_ir:
-            cmd = f'{os.path.join(llvm_dir,"clang++")} {cflags} -emit-llvm -c {optlevel} {source} -o {output}'
-            flag, ret = cls.runcmd(cmd, cwd)
+            cmd = f'{os.path.join(llvm_dir, self.compiler)} {cflags} -emit-llvm -c {optlevel} {source} -o {output}'
+            flag, ret = self.runcmd(cmd, cwd)
             assert flag == True, 'Check command in {}: {}'.format(cwd, cmd)
         else:
-            cmd = f'{os.path.join(llvm_dir,"clang++")} {cflags} -emit-llvm -c {optlevel} -Xclang -disable-llvm-optzns {source} -o {output}'
-            flag, ret = cls.runcmd(cmd, cwd)
+            cmd = f'{os.path.join(llvm_dir, self.compiler)} {cflags} -emit-llvm -c {optlevel} -Xclang -disable-llvm-optzns {source} -o {output}'
+            flag, ret = self.runcmd(cmd, cwd)
             assert flag == True, 'Check command in {}: {}'.format(cwd, cmd)
 
         
@@ -313,6 +348,7 @@ class Clangopt:
         cmd = f'{os.path.join(llvm_dir,"opt")} -passes="{opt_params}" {IR_pgouse} -o {IR_opt} -stats -stats-json 2> {opt_stats}'
         flag, ret = cls.runcmd(cmd, cwd)
         if not flag:
+            print('wrong saved stats', opt_stats)
             os.remove(opt_stats)
         # os.remove(IR_pgouse)
         os.remove(IR)
@@ -323,7 +359,7 @@ class Clangopt:
     @classmethod
     def IR2obj(cls, llvm_dir, IR_opt, obj, obj_cp, cflags, cwd=None):
         # if args.instrument_ir:
-        #     cmd=f'clang++ {args.optlevel} -xir -c {IR_opt} {cflags} -o {obj}'
+        #     cmd=f'clang {args.optlevel} -xir -c {IR_opt} {cflags} -o {obj}'
         #     flag, ret = cls.runcmd(cmd, cwd)
         #     assert flag == True, cmd
         #     return flag
@@ -331,7 +367,7 @@ class Clangopt:
         # cmd = os.path.join(llvm_dir,'llc')+'  -O3 {} -o {} --print-machine-bfi 2> {}'.format(IR_opt, asm, machinebfi)
         cmd = os.path.join(llvm_dir,'llc')+' -O3 -filetype=obj -relocation-model=pic {} -o {}'.format(IR_opt, obj)
         # cmd = os.path.join(llvm_dir,'llc')+' -O3 -filetype=obj {} -o {}'.format(IR_opt, obj)
-        # cmd = os.path.join(llvm_dir,'clang++')+' -c {} -o {}'.format(IR_opt, obj)
+        # cmd = os.path.join(llvm_dir,'clang')+' -c {} -o {}'.format(IR_opt, obj)
         flag, ret = cls.runcmd(cmd, cwd)
         print(cmd,cwd)
         assert flag == True, cmd

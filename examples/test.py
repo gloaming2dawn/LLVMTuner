@@ -1,24 +1,24 @@
-import llvmtuner
-from llvmtuner.searchspace import default_space, passlist2str, parse_O3string
+import re
 
-import os
-import json
-import hashlib
-result_dir = '/home/jiayu/result_llvmtuner_17/cBench/security_sha/cost_model/result.json'
-tmp_dir = '/home/jiayu/result_llvmtuner_17/cBench/security_sha/cost_model/'
-fileroot = 'sha'
-with open(result_dir, 'r') as file:
-    for line in file:
-        config_path, time = json.loads(line)
-print(config_path, time)
-with open(config_path, 'r') as file:
-    config = json.load(file)
-    opt_str=config['params'][fileroot]
-hash_str = hashlib.md5(opt_str.encode('utf-8')).hexdigest()
-IR_dir=os.path.join(tmp_dir, fileroot, f'IR-{hash_str}/')
-print(IR_dir)
-print(config)
-# os.makedirs(IR_dir, exist_ok=True)
+# 示例链接命令
+link_commands = [
+    'clang -o outputfile target1.o target2.o',
+    'clang -flag target1.o target2.o -o outputfile',
+    'clang -o my_output_file long_option -o another_output target3.o',
+    'clang -o outputfile -someflag -otherflag target1.o target2.o',
+    'clang -o outputfile -someflag -otherflag target2.o target1.o -o outputfile.out a.cpp'
+]
 
+# 正则表达式匹配目标文件
+def extract_object_files(command):
+    # 提取 -o 标志之前的所有 .o 文件
+    # 先匹配目标文件
+    matches = re.findall(r'\b(\S+\.o)\b', command)
+    return matches
 
-
+# 处理所有示例链接命令
+for command in link_commands:
+    object_files = extract_object_files(command)
+    print(f'Command: {command}')
+    print(f'Object Files: {object_files}')
+    print('---')

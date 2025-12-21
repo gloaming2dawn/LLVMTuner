@@ -266,9 +266,8 @@ def default_space():
     # print(other_passes)
     # other_passes =[]
     passes=sorted(list(set(O3_passes + other_passes)))
-    print('Number of used passes:',len(passes))
+    # print('Number of used passes:',len(passes))
 
-    
 
     return passes, passes_clear, pass2kind, O3_trans_seq
     
