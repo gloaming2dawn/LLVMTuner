@@ -1,3 +1,0 @@
-200.c -O3 -finline-limit=50000
-scilab.c -O3 -finline-limit=50000
-train01.c -O3 -finline-limit=50000
